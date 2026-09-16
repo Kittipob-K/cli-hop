@@ -80,23 +80,20 @@ export interface Agent {
   /** Env var names removed from the child process environment before spawn. */
   envToUnset?: readonly string[];
   /**
-   * Per-agent overrides of the env vars that receive the primary API key /
-   * base URL. When omitted, cli-hop applies the per-type defaults so a single
-   * configured key and endpoint work with every agent CLI automatically.
-   */
-  apiKeyEnvVars: readonly string[];
-  baseUrlEnvVars: readonly string[];
-  /**
    * Prefix prepended to the model id when passing --model to the agent CLI
    * (e.g. "cli-hop/" for omp, whose model selector is provider/modelId).
    */
   modelPrefix?: string;
   /** CLI Hop wire protocols this CLI can use. */
   supportedProtocols: readonly WireProtocol[];
-  /** Optional suffix applied to the normalized endpoint before env export. */
-  baseUrlSuffix?: string;
   /** Override the generic --model argument construction when needed. */
   buildArgs?: (options: RunOptions) => string[];
+  /**
+   * Read the currently configured model from the agent's existing config
+   * (used by the Settings Resync action, ADR 0003). `exists: false` when the
+   * agent has no config file on disk yet.
+   */
+  probeConfig?: () => Promise<ConfigProbe>;
   /** Prepare persistent CLI configuration before launch. */
   prepare?: (input: AgentPreparationInput) => Promise<string[]>;
   /** Optional cleanup offered only in the interactive customize flow. */
@@ -104,33 +101,21 @@ export interface Agent {
   installUrl?: string;
 }
 
-/**
- * Which environment variables each agent reads its API key from.
- * A registered agent automatically gets the primary API key
- * injected into these vars — no extra wiring needed.
- */
-/** Resolve the API key env vars for an agent (override or per-type default). */
-export function apiKeyEnvVarsFor(agent: Agent): readonly string[] {
-  return agent.apiKeyEnvVars;
-}
-
-/**
- * Which environment variables each agent reads its base URL from.
- * The configured CLI Hop endpoint (e.g. https://api.cli-hop.cc) is
- * exported to these vars when launching, equivalent to:
- *   export ANTHROPIC_BASE_URL=https://api.cli-hop.cc
- */
-/** Resolve the base URL env vars for an agent (override or per-type default). */
-export function baseUrlEnvVarsFor(agent: Agent): readonly string[] {
-  return agent.baseUrlEnvVars;
+/** What the Resync action needs to know about an agent's existing config. */
+export interface ConfigProbe {
+  /** Whether the agent's config file exists on disk. */
+  exists: boolean;
+  /** The model currently configured there, when readable. */
+  model?: string;
 }
 
 /** User settings persisted in ~/.config/cli-hop/settings.json */
 export interface Settings {
   /**
-   * Primary API key injected into every agent CLI that reads a key from env.
-   * The Credential Store (OS keychain) is authoritative at rest: SettingsService
-   * returns it from the keychain when available and persists it there, using
+   * Primary API key delivered to each agent through its own Agent Config
+   * (ADR 0003). The Credential Store (OS keychain) is authoritative at rest:
+   * SettingsService returns it from the keychain when available and persists
+   * it there, using
    * this file only as the fallback location on systems with no usable keychain.
    */
   apiKey?: string;
@@ -174,10 +159,6 @@ export interface RunOptions {
   pool?: string;
   model?: string;
   args?: string[];
-  /** Primary API key from settings; injected into the selected agent's env vars. */
-  apiKey?: string;
-  /** CLI Hop endpoint (without /v1) exported as the agent's base URL. */
-  baseUrl?: string;
 }
 
 export interface LaunchPlan {

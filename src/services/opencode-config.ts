@@ -1,6 +1,6 @@
 import { homedir } from "node:os";
 import { join } from "node:path";
-import type { RemoteModel } from "../types.js";
+import type { ConfigProbe, RemoteModel } from "../types.js";
 import { writeSecureFile } from "./secure-file.js";
 import { readJsonDocument } from "./config-document.js";
 
@@ -13,6 +13,8 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 }
 
 export interface OpenCodeConfigInput {
+  /** Primary API Key written literally so opencode runs standalone (ADR 0003). */
+  apiKey: string;
   endpoint: string;
   models: RemoteModel[];
   selected: string;
@@ -92,7 +94,7 @@ export class OpenCodeConfigService {
       options: {
         ...(provider.options ?? {}),
         baseURL: `${input.endpoint.replace(/\/+$/, "")}/v1`,
-        apiKey: "{env:CLI_HOP_API_KEY}",
+        apiKey: input.apiKey,
       },
       models,
     };
@@ -108,5 +110,19 @@ export class OpenCodeConfigService {
 
     await writeSecureFile(this.configPath, `${JSON.stringify(output, null, 2)}\n`);
     return { path: this.configPath, staleModels };
+  }
+
+  /** The configured `model` ref, with its `cli-hop/` prefix stripped (Resync). */
+  async probe(): Promise<ConfigProbe> {
+    try {
+      const { value } = await readJsonDocument(this.configPath, {
+        jsonc: true,
+        invalidMessage: () => "",
+      });
+      const model = typeof value.model === "string" ? value.model.replace(/^cli-hop\//, "") : undefined;
+      return { exists: true, model };
+    } catch {
+      return { exists: false };
+    }
   }
 }

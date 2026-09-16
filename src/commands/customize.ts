@@ -10,7 +10,7 @@ import { ensureAgentInstalled } from "../services/installer.js";
 import { ensurePrerequisites } from "../services/prereq.js";
 import { sectionTabs } from "../prompts/section-tabs.js";
 import type { Pool } from "../types.js";
-import { apiKeyEnvVarsFor, baseUrlEnvVarsFor, DEFAULT_MODELS_BASE_URL } from "../types.js";
+import { DEFAULT_MODELS_BASE_URL } from "../types.js";
 import * as ui from "../ui.js";
 
 /**
@@ -85,24 +85,14 @@ export const customizeCommand = new Command("customize")
           ui.muted("  (no env vars to unset)");
         }
 
-        // 2. Inject the primary API key and base URL into the agent's environment.
+        // 2. The key + endpoint are written into the Agent Config (ADR 0003);
+        // nothing is injected into the environment.
         const endpoint = endpointFromModelsBaseUrl(
           settings.baseUrl ?? DEFAULT_MODELS_BASE_URL
         );
-        const keyVars = apiKeyEnvVarsFor(agent);
-        const urlVars = baseUrlEnvVarsFor(agent);
-        if (keyVars.length > 0) {
-          ui.ok(
-            `${ui.envvar(keyVars[0] + "=")}${ui.val(SettingsService.maskKey(settings.apiKey!))} ${ui.dim("(primary API key)")}`
-          );
-        } else {
-          ui.muted(
-            `  (${agent.name} does not read the API key from env — skipping)`
-          );
-        }
-        if (urlVars.length > 0) {
-          ui.ok(`${ui.envvar(urlVars[0] + "=")}${ui.url(endpoint)}`);
-        }
+        ui.muted(
+          `  credentials delivered via ${agent.name}'s config — no env export`
+        );
 
         // 3. Pull the model list from the CLI Hop API and let the user choose.
         const spinner = new ui.Spinner("Fetching models from CLI Hop API");

@@ -2,20 +2,15 @@ import { readFile } from "node:fs/promises";
 import { homedir } from "node:os";
 import { join } from "node:path";
 import { parse, stringify } from "yaml";
-import type { RemoteModel } from "../types.js";
+import type { ConfigProbe, RemoteModel } from "../types.js";
 import { writeSecureFile } from "./secure-file.js";
 
 /** Provider id written into models.yml; also omp's --model prefix. */
 export const OMP_PROVIDER_ID = "cli-hop";
 
-/**
- * Env var NAME stored as the provider's apiKey in models.yml. omp resolves
- * `apiKey` values first as an env var, so the secret stays in the child
- * process environment (exported from Settings) and never on disk.
- */
-export const OMP_API_KEY_ENV = "CLI_HOP_API_KEY";
-
 export interface OmpModelsInput {
+  /** Primary API Key written literally so omp runs standalone (ADR 0003). */
+  apiKey: string;
   /** Endpoint root WITHOUT /v1, e.g. https://api.cli-hop.cc */
   endpoint: string;
   /** Full catalogue to write (all pools from the CLI Hop API). */
@@ -86,7 +81,7 @@ export class OmpConfigService {
 
     providers[OMP_PROVIDER_ID] = {
       baseUrl: `${input.endpoint.replace(/\/+$/, "")}/v1`,
-      apiKey: OMP_API_KEY_ENV,
+      apiKey: input.apiKey,
       // CLI Hop speaks Bearer auth on both wires (like the /models API).
       authHeader: true,
       // Anthropic-fronted proxies commonly reject the `strict` tool field.
@@ -101,5 +96,23 @@ export class OmpConfigService {
 
     await writeSecureFile(this.modelsPath, stringify(doc));
     return this.modelsPath;
+  }
+
+  /** The first model listed under the cli-hop provider, when present (Resync). */
+  async probe(): Promise<ConfigProbe> {
+    try {
+      const raw = await readFile(this.modelsPath, "utf8");
+      const doc = parse(raw) as { providers?: Record<string, unknown> };
+      const provider = doc?.providers?.[OMP_PROVIDER_ID] as
+        | { models?: Array<{ id?: unknown }> }
+        | undefined;
+      const first = provider?.models?.[0]?.id;
+      return {
+        exists: true,
+        model: typeof first === "string" ? first : undefined,
+      };
+    } catch {
+      return { exists: false };
+    }
   }
 }

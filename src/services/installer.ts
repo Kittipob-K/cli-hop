@@ -11,8 +11,7 @@ import * as ui from "../ui.js";
  * Install commands are the verbatim one-liners from each agent's official
  * documentation (verified 2026-09): code.claude.com/docs/en/setup,
  * developers.openai.com/codex/cli/, docs.x.ai/build/overview,
- * opencode.ai/docs/, pi.dev/docs/latest, omp.sh / github.com/can1357/oh-my-pi,
- * aider.chat/docs/install.html.
+ * opencode.ai/docs/, pi.dev/docs/latest, omp.sh / github.com/can1357/oh-my-pi.
  */
 
 /** The platforms cli-hop distinguishes for install commands. */
@@ -150,36 +149,6 @@ export const AGENT_INSTALL_SPECS: Record<string, AgentInstallSpec> = {
     // xAI ships no npm package — the npm `grok-cli` is third-party, never offered.
     windows: irmPipe("https://x.ai/cli/install.ps1"),
     docsUrl: "https://docs.x.ai/build/overview",
-  },
-  aider: {
-    macos: {
-      steps: [{
-        kind: "sequential",
-        steps: [
-          { kind: "script", shell: "bash", command: "python3 -m pip install aider-install" },
-          { kind: "script", shell: "bash", command: "aider-install" },
-        ],
-      }],
-    },
-    linux: {
-      steps: [{
-        kind: "sequential",
-        steps: [
-          { kind: "script", shell: "bash", command: "python3 -m pip install aider-install" },
-          { kind: "script", shell: "bash", command: "aider-install" },
-        ],
-      }],
-    },
-    windows: {
-      steps: [{
-        kind: "sequential",
-        steps: [
-          { kind: "powershell", command: "python -m pip install aider-install" },
-          { kind: "powershell", command: "aider-install" },
-        ],
-      }],
-    },
-    docsUrl: "https://aider.chat/docs/install.html",
   },
 };
 

@@ -1,6 +1,7 @@
 import { readFile } from "node:fs/promises";
 import { homedir } from "node:os";
 import { join } from "node:path";
+import type { ConfigProbe } from "../types.js";
 import { writeSecureFile } from "./secure-file.js";
 
 /**
@@ -172,5 +173,16 @@ export class GrokConfigService {
     const merged = mergeGrokToml(existing, input);
     await writeSecureFile(this.configPath, merged.endsWith("\n") ? merged : `${merged}\n`);
     return [this.configPath];
+  }
+
+  /** The `[models] default` model, when present (Resync). */
+  async probe(): Promise<ConfigProbe> {
+    try {
+      const raw = await readFile(this.configPath, "utf8");
+      const match = raw.match(/^\[models\][\s\S]*?^default\s*=\s*"([^"]+)"/m);
+      return { exists: true, model: match?.[1] };
+    } catch {
+      return { exists: false };
+    }
   }
 }

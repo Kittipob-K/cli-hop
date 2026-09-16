@@ -1,10 +1,6 @@
 import { spawn } from "node:child_process";
 import type { Agent, AgentPreparationInput, LaunchPlan, RunOptions } from "../types.js";
-import {
-  apiKeyEnvVarsFor,
-  baseUrlEnvVarsFor,
-  GATEWAY_CREDENTIAL_ENV_KEYS,
-} from "../types.js";
+import { GATEWAY_CREDENTIAL_ENV_KEYS } from "../types.js";
 
 export class AgentService {
   async prepare(agent: Agent, input: AgentPreparationInput): Promise<string[]> {
@@ -15,14 +11,11 @@ export class AgentService {
     return agent.scrubShellConfig ? agent.scrubShellConfig() : [];
   }
   /**
-   * Build a clean environment for the agent: remove (unset) every env var
-   * listed in agent.envToUnset, then export the primary API key and the
-   * CLI Hop base URL from settings into the env vars the agent's type reads
-   * them from — equivalent to:
-   *   export ANTHROPIC_BASE_URL=https://api.cli-hop.cc
-   *   export ANTHROPIC_API_KEY=<primary key>
+   * Build the child environment: the inherited environment with every
+   * credential/proxy variable cli-hop manages removed (ADR 0003). Nothing is
+   * injected — each agent reads its key + endpoint from its own Agent Config.
    */
-  prepareEnv(agent: Agent, options: RunOptions = {}): NodeJS.ProcessEnv {
+  cleanEnv(agent: Agent): NodeJS.ProcessEnv {
     const env: NodeJS.ProcessEnv = { ...process.env };
     const keysToUnset = new Set([
       ...GATEWAY_CREDENTIAL_ENV_KEYS,
@@ -30,18 +23,6 @@ export class AgentService {
     ]);
     for (const key of keysToUnset) {
       delete env[key];
-    }
-    if (options.apiKey) {
-      for (const key of apiKeyEnvVarsFor(agent)) {
-        env[key] = options.apiKey;
-      }
-    }
-    if (options.baseUrl) {
-      const normalizedBaseUrl = options.baseUrl.replace(/\/+$/, "");
-      const baseUrl = normalizedBaseUrl + (agent.baseUrlSuffix ?? "");
-      for (const key of baseUrlEnvVarsFor(agent)) {
-        env[key] = baseUrl;
-      }
     }
     return env;
   }
@@ -98,7 +79,7 @@ export class AgentService {
     return {
       command: agent.command,
       args: this.buildArgs(agent, options),
-      env: this.prepareEnv(agent, options),
+      env: this.cleanEnv(agent),
     };
   }
 

@@ -1,19 +1,15 @@
 import { homedir } from "node:os";
 import { join } from "node:path";
-import type { RemoteModel } from "../types.js";
+import type { ConfigProbe, RemoteModel } from "../types.js";
 import { writeSecureFile } from "./secure-file.js";
 import { readJsonDocument } from "./config-document.js";
 
 /** Provider id written into Pi's models.json; also Pi's --model prefix. */
 export const PI_PROVIDER_ID = "cli-hop";
 
-/**
- * The environment variable reference stored in Pi's models.json. The secret
- * is supplied only in the child environment from cli-hop Settings.
- */
-export const PI_API_KEY_ENV = "CLI_HOP_API_KEY";
-
 export interface PiModelsInput {
+  /** Primary API Key written literally so pi runs standalone (ADR 0003). */
+  apiKey: string;
   /** Endpoint root WITHOUT /v1, e.g. https://api.cli-hop.cc */
   endpoint: string;
   /** Full catalogue to write (all pools from the CLI Hop API). */
@@ -73,7 +69,7 @@ export class PiConfigService {
 
     providers[PI_PROVIDER_ID] = {
       baseUrl: `${input.endpoint.replace(/\/+$/, "")}/v1`,
-      apiKey: `$${PI_API_KEY_ENV}`,
+      apiKey: input.apiKey,
       authHeader: true,
       models: catalogue.map((model) => ({
         id: model.id,
@@ -88,5 +84,26 @@ export class PiConfigService {
       `${JSON.stringify(doc, null, 2)}\n`
     );
     return this.modelsPath;
+  }
+
+  /** The first model listed under the cli-hop provider, when present (Resync). */
+  async probe(): Promise<ConfigProbe> {
+    try {
+      const { value } = await readJsonDocument(this.modelsPath, {
+        jsonc: true,
+        invalidMessage: () => "",
+      });
+      const providers = value.providers as Record<string, unknown> | undefined;
+      const provider = providers?.[PI_PROVIDER_ID] as
+        | { models?: Array<{ id?: unknown }> }
+        | undefined;
+      const first = provider?.models?.[0]?.id;
+      return {
+        exists: true,
+        model: typeof first === "string" ? first : undefined,
+      };
+    } catch {
+      return { exists: false };
+    }
   }
 }

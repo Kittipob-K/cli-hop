@@ -1,9 +1,11 @@
-import { readFile, writeFile, unlink } from "node:fs/promises";
+import { unlink } from "node:fs/promises";
 import { homedir } from "node:os";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
+import type { ConfigProbe } from "../types.js";
 import { endpointFromModelsBaseUrl } from "./endpoint.js";
 import { writeSecureFile } from "./secure-file.js";
 import { readJsonDocument } from "./config-document.js";
+import { scrubShellRc } from "./shell-scrub.js";
 
 /**
  * Configures Claude Code the same way the CLI Hop one-line installer does:
@@ -62,6 +64,22 @@ export class ClaudeConfigService {
     return endpointFromModelsBaseUrl(baseUrl);
   }
 
+  /** The currently configured model, when settings.json exists (Resync). */
+  async probe(): Promise<ConfigProbe> {
+    try {
+      const { value, existed } = await readJsonDocument(this.settingsPath, {
+        invalidMessage: () => "",
+      });
+      return {
+        exists: existed,
+        model: typeof value.model === "string" ? value.model : undefined,
+      };
+    } catch {
+      // Malformed config still counts as existing — Resync rewrites it.
+      return { exists: true };
+    }
+  }
+
   async apply(input: ClaudeConfigInput): Promise<string[]> {
     const changed: string[] = [];
     const { apiKey, endpoint, model } = input;
@@ -104,9 +122,10 @@ export class ClaudeConfigService {
     changed.push(this.settingsPath);
 
     // 3. Remove stale OAuth/credential files so the API key takes over.
+    const claudeDir = dirname(this.settingsPath);
     for (const stale of [
-      join(homedir(), ".claude", ".credentials.json"),
-      join(homedir(), ".claude", "auth.json"),
+      join(claudeDir, ".credentials.json"),
+      join(claudeDir, "auth.json"),
     ]) {
       try {
         await unlink(stale);
@@ -132,41 +151,7 @@ export class ClaudeConfigService {
     "CLAUDE_CODE_OAUTH_TOKEN",
   ];
 
-  async scrubShellRc(): Promise<string[]> {
-    const vars = ClaudeConfigService.SCRUB_VARS.join("|");
-    const bashLike = new RegExp(
-      `^\\s*(export\\s+)?(${vars})=`
-    );
-    const fishLine = new RegExp(
-      `^\\s*set\\s+-[a-zA-Z]*[xe][a-zA-Z]*\\s+(${vars})(\\s|$)`
-    );
-    const home = homedir();
-    const rcFiles = [
-      join(home, ".zshrc"),
-      join(home, ".zprofile"),
-      join(home, ".bashrc"),
-      join(home, ".bash_profile"),
-      join(home, ".profile"),
-      join(home, ".config", "fish", "config.fish"),
-    ];
-    const touched: string[] = [];
-
-    for (const rc of rcFiles) {
-      let raw: string;
-      try {
-        raw = await readFile(rc, "utf8");
-      } catch {
-        continue;
-      }
-      const kept = raw
-        .split("\n")
-        .filter((line) => !bashLike.test(line) && !fishLine.test(line))
-        .join("\n");
-      if (kept !== raw) {
-        await writeFile(rc, kept, "utf8");
-        touched.push(rc);
-      }
-    }
-    return touched;
+  async scrubShellRc(home: string = homedir()): Promise<string[]> {
+    return scrubShellRc(ClaudeConfigService.SCRUB_VARS, home);
   }
 }

@@ -26,15 +26,13 @@ export const CUSTOMIZABLE_AGENTS: Agent[] = [
     id: "claude-code",
     name: "Claude Code",
     command: "claude",
-    apiKeyEnvVars: ["ANTHROPIC_API_KEY"],
-    baseUrlEnvVars: ["ANTHROPIC_BASE_URL"],
     // Before launching Claude Code, unset the inherited Anthropic/proxy
-    // credentials so cli-hop can manage them explicitly. The primary API key
-    // from settings is then injected through the registry env mapping.
+    // credentials so the Agent Config (its only key source, ADR 0003) wins.
     envToUnset: CLAUDE_CODE_ENV_KEYS,
     supportedProtocols: ["messages"],
     prepare: async ({ apiKey, endpoint, selected }) =>
       new ClaudeConfigService().apply({ apiKey, endpoint, model: selected }),
+    probeConfig: () => new ClaudeConfigService().probe(),
     scrubShellConfig: () => new ClaudeConfigService().scrubShellRc(),
     installUrl: "https://docs.anthropic.com/en/docs/claude-code",
   },
@@ -42,8 +40,6 @@ export const CUSTOMIZABLE_AGENTS: Agent[] = [
     id: "omp",
     name: "Oh My Pi",
     command: "omp",
-    apiKeyEnvVars: ["CLI_HOP_API_KEY"],
-    baseUrlEnvVars: [],
     // Inherited Anthropic/proxy vars plus pi/omp config-dir pointers that
     // would relocate ~/.omp away from the models.yml we write.
     envToUnset: OMP_ENV_KEYS,
@@ -51,43 +47,29 @@ export const CUSTOMIZABLE_AGENTS: Agent[] = [
     // CLI Hop copy from built-in providers with the same ids.
     modelPrefix: "cli-hop/",
     supportedProtocols: ["chat_completions"],
-    prepare: async ({ endpoint, models, selected }) => [
-      await new OmpConfigService().apply({ endpoint, models, selected }),
+    prepare: async ({ apiKey, endpoint, models, selected }) => [
+      await new OmpConfigService().apply({ apiKey, endpoint, models, selected }),
     ],
+    probeConfig: () => new OmpConfigService().probe(),
     installUrl: "https://github.com/can1357/oh-my-pi",
   },
   {
     id: "pi",
     name: "Pi",
     command: "pi",
-    apiKeyEnvVars: ["CLI_HOP_API_KEY"],
-    baseUrlEnvVars: [],
     envToUnset: PI_ENV_KEYS,
     modelPrefix: "cli-hop/",
     supportedProtocols: ["chat_completions"],
-    prepare: async ({ endpoint, models, selected }) => [
-      await new PiConfigService().apply({ endpoint, models, selected }),
+    prepare: async ({ apiKey, endpoint, models, selected }) => [
+      await new PiConfigService().apply({ apiKey, endpoint, models, selected }),
     ],
+    probeConfig: () => new PiConfigService().probe(),
     installUrl: "https://pi.dev/docs/latest",
-  },
-  {
-    id: "aider",
-    name: "Aider",
-    command: "aider",
-    apiKeyEnvVars: ["OPENAI_API_KEY"],
-    baseUrlEnvVars: ["OPENAI_API_BASE"],
-    envToUnset: OPENAI_COMPATIBLE_ENV_KEYS,
-    modelPrefix: "openai/",
-    baseUrlSuffix: "/v1",
-    supportedProtocols: ["chat_completions"],
-    installUrl: "https://aider.chat/docs/install.html",
   },
   {
     id: "opencode",
     name: "OpenCode",
     command: "opencode",
-    apiKeyEnvVars: ["CLI_HOP_API_KEY"],
-    baseUrlEnvVars: [],
     envToUnset: ["CLI_HOP_API_KEY", ...OPENAI_COMPATIBLE_ENV_KEYS],
     supportedProtocols: ["chat_completions"],
     // OpenCode treats bare positional arguments as a directory. Use its `run`
@@ -98,8 +80,9 @@ export const CUSTOMIZABLE_AGENTS: Agent[] = [
       if (options.args) args.push(...options.args);
       return args;
     },
-    prepare: async ({ endpoint, models, selected }) => {
+    prepare: async ({ apiKey, endpoint, models, selected }) => {
       const result = await new OpenCodeConfigService().apply({
+        apiKey,
         endpoint,
         models,
         selected,
@@ -111,28 +94,19 @@ export const CUSTOMIZABLE_AGENTS: Agent[] = [
       }
       return [result.path];
     },
+    probeConfig: () => new OpenCodeConfigService().probe(),
     installUrl: "https://opencode.ai/docs/",
   },
   {
     id: "codex",
     name: "Codex CLI",
     command: "codex",
-    apiKeyEnvVars: ["CLI_HOP_API_KEY"],
-    baseUrlEnvVars: [],
     envToUnset: ["CLI_HOP_API_KEY", ...OPENAI_COMPATIBLE_ENV_KEYS, ...CODEX_ENV_KEYS],
     supportedProtocols: ["responses"],
     buildArgs: (options) => {
-      const endpoint = options.baseUrl?.replace(/\/+$/, "");
+      // The provider config lives in the deployed ~/.codex/config.toml
+      // (ADR 0003); launch only passes the model and the user's arguments.
       const args = options.model ? ["--model", options.model] : [];
-      if (endpoint) {
-        args.push(
-          "-c", 'model_provider="cli-hop"',
-          "-c", 'model_providers.cli-hop.name="CLI Hop"',
-          "-c", `model_providers.cli-hop.base_url=${JSON.stringify(`${endpoint}/v1`)}`,
-          "-c", 'model_providers.cli-hop.env_key="CLI_HOP_API_KEY"',
-          "-c", 'model_providers.cli-hop.wire_api="responses"'
-        );
-      }
       if (options.args) args.push(...options.args);
       return args;
     },
@@ -140,6 +114,7 @@ export const CUSTOMIZABLE_AGENTS: Agent[] = [
     // and auth.json so `codex` works standalone, not only through cli-hop.
     prepare: async ({ apiKey, endpoint, selected }) =>
       new CodexConfigService().apply({ apiKey, endpoint, model: selected }),
+    probeConfig: () => new CodexConfigService().probe(),
     scrubShellConfig: () =>
       scrubShellRc([
         "CODEX_API_KEY",
@@ -158,8 +133,6 @@ export const CUSTOMIZABLE_AGENTS: Agent[] = [
     command: "grok",
     // Grok reads the key from the inline api_key inside the managed
     // ~/.grok/config.toml block — no API-key env var, installer parity.
-    apiKeyEnvVars: [],
-    baseUrlEnvVars: [],
     envToUnset: [...GROK_ENV_KEYS],
     supportedProtocols: ["chat_completions"],
     // The managed config block pins the default model; the launch only
@@ -175,6 +148,7 @@ export const CUSTOMIZABLE_AGENTS: Agent[] = [
         contextWindow: selected === "grok-4.5" ? 1000000 : undefined,
       });
     },
+    probeConfig: () => new GrokConfigService().probe(),
     scrubShellConfig: () => scrubShellRc([
       "CLI_HOP_API_KEY",
       "CLI_HOP_AI_API_KEY",

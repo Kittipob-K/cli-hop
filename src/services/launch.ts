@@ -54,8 +54,6 @@ export class LaunchCoordinator {
         pool: request.poolId,
         model: request.model,
         args: request.args,
-        apiKey: request.settings.apiKey,
-        baseUrl: request.settings.apiKey ? endpoint : undefined,
       },
     };
   }

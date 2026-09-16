@@ -6,6 +6,7 @@ export type SectionMenuAction =
   | { type: "agent"; id: string }
   | { type: "apiKey" }
   | { type: "baseUrl" }
+  | { type: "resync" }
   | { type: "reset" }
   | { type: "back" };
 
@@ -33,6 +34,7 @@ export const sectionTabs = createPrompt<SectionMenuAction, SectionMenuConfig>(
     const settingsItems: SectionMenuAction[] = [
       { type: "apiKey" },
       { type: "baseUrl" },
+      { type: "resync" },
       { type: "reset" },
     ];
     const items = section === "agents"
@@ -67,6 +69,7 @@ export const sectionTabs = createPrompt<SectionMenuAction, SectionMenuConfig>(
       : [
           `API Key: ${config.apiKey ? ui.val("Change " + config.apiKey.slice(0, 4) + "…" + config.apiKey.slice(-4)) : ui.dim("Set API key")}`,
           `Base URL: ${config.baseUrl ? ui.url(config.baseUrl) : ui.dim("Set base URL")}`,
+          "Resync agent configs",
           "Reset API key and base URL",
         ];
     const list = names.map((name, index) =>
