@@ -25,7 +25,7 @@ test("LaunchCoordinator prepares one consistent launch contract", async () => {
     async run() { return 0; },
   };
   const coordinator = new LaunchCoordinator(undefined, agentService);
-  const agent = getAgentById("aider");
+  const agent = getAgentById("opencode");
   assert.ok(agent);
   const result = await coordinator.prepare({
     agent,
@@ -41,8 +41,6 @@ test("LaunchCoordinator prepares one consistent launch contract", async () => {
     pool: "remote:model",
     model: "model",
     args: ["--yes"],
-    apiKey: "key",
-    baseUrl: "https://gateway.example.com",
   });
   assert.equal(calls[0].input.endpoint, "https://gateway.example.com");
 });
@@ -60,11 +58,11 @@ test("LaunchCoordinator runs a prepared launch without preparing twice", async (
     },
   };
   const coordinator = new LaunchCoordinator(undefined, agentService);
-  const agent = getAgentById("aider");
+  const agent = getAgentById("opencode");
   assert.ok(agent);
   const prepared = await coordinator.prepare({
     agent,
-    poolId: "local:aider",
+    poolId: "local:opencode",
     model: "model",
     settings: { apiKey: "key", baseUrl: "https://gateway.example.com/v1" },
   });

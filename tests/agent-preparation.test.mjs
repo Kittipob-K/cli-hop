@@ -15,6 +15,7 @@ test("OpenCode config preserves other providers and references the key from env"
   );
 
   const result = await new OpenCodeConfigService(configPath).apply({
+    apiKey: "test-key",
     endpoint: "https://gateway.example.com",
     models: [
       { id: "claude-model", apis: ["messages"] },
@@ -27,7 +28,7 @@ test("OpenCode config preserves other providers and references the key from env"
 
   const config = JSON.parse(await readFile(configPath, "utf8"));
   assert.equal(config.provider.existing.name, "Existing");
-  assert.equal(config.provider["cli-hop"].options.apiKey, "{env:CLI_HOP_API_KEY}");
+  assert.equal(config.provider["cli-hop"].options.apiKey, "test-key");
   assert.equal(
     config.provider["cli-hop"].options.baseURL,
     "https://gateway.example.com/v1"
@@ -36,7 +37,7 @@ test("OpenCode config preserves other providers and references the key from env"
   assert.deepEqual(Object.keys(config.provider["cli-hop"].models), ["chat-model"]);
   assert.equal(config.model, "cli-hop/chat-model");
   assert.equal(config.small_model, "cli-hop/chat-model");
-  assert.equal(JSON.stringify(config).includes("test-key"), false);
+  assert.equal(config.provider["cli-hop"].options.apiKey, "test-key");
 });
 
 test("OpenCode config adds the schema only when it creates the file", async () => {
@@ -44,6 +45,7 @@ test("OpenCode config adds the schema only when it creates the file", async () =
   const configPath = join(directory, "opencode.json");
 
   const created = await new OpenCodeConfigService(configPath).apply({
+    apiKey: "test-key",
     endpoint: "https://gateway.example.com",
     models: [{ id: "chat-model", apis: ["chat_completions"] }],
     selected: "chat-model",
@@ -58,6 +60,7 @@ test("OpenCode config adds the schema only when it creates the file", async () =
   await writeFile(configPath, JSON.stringify({ theme: "dark" }));
 
   await new OpenCodeConfigService(configPath).apply({
+    apiKey: "test-key",
     endpoint: "https://gateway.example.com",
     models: [{ id: "chat-model", apis: ["chat_completions"] }],
     selected: "chat-model",
@@ -98,6 +101,7 @@ test("OpenCode config adds new models without dropping existing model settings",
   );
 
   const result = await new OpenCodeConfigService(configPath).apply({
+    apiKey: "test-key",
     endpoint: "https://gateway.example.com",
     models: [
       { id: "new-model", displayName: "New model", apis: ["chat_completions"] },
@@ -127,6 +131,7 @@ test("OpenCode config adds new models without dropping existing model settings",
   assert.equal(config.model, "cli-hop/new-model");
 
   const second = await new OpenCodeConfigService(configPath).apply({
+    apiKey: "test-key",
     endpoint: "https://gateway.example.com",
     models: [{ id: "another-model", apis: ["chat_completions"] }],
     selected: "another-model",
@@ -156,6 +161,7 @@ test("OpenCode config resolves the model name from displayName, then the saved n
   );
 
   await new OpenCodeConfigService(configPath).apply({
+    apiKey: "test-key",
     endpoint: "https://gateway.example.com",
     models: [
       { id: "renamed-model", apis: ["chat_completions"] },
@@ -185,6 +191,7 @@ test("OpenCode config removes entries outside the catalogue", async () => {
   );
 
   const result = await new OpenCodeConfigService(configPath).apply({
+    apiKey: "test-key",
     endpoint: "https://gateway.example.com",
     models: [{ id: "model", apis: ["chat_completions"] }],
     selected: "model",
@@ -215,6 +222,7 @@ test("OpenCode config removes old entries when the API omits capability metadata
   );
 
   const result = await new OpenCodeConfigService(configPath).apply({
+    apiKey: "test-key",
     endpoint: "https://gateway.example.com",
     models: [{ id: "current-model" }],
     selected: "current-model",
@@ -239,6 +247,7 @@ test("OpenCode config routes each wire to its own provider without calling model
   );
 
   const result = await new OpenCodeConfigService(configPath).apply({
+    apiKey: "test-key",
     endpoint: "https://gateway.example.com",
     models: [
       { id: "messages-only", apis: ["chat_completions"] },
@@ -259,6 +268,7 @@ test("OpenCode config prefers the Anthropic provider ref for a messages-only sel
   const configPath = join(directory, "opencode.json");
 
   await new OpenCodeConfigService(configPath).apply({
+    apiKey: "test-key",
     endpoint: "https://gateway.example.com",
     models: [
       { id: "claude-model", apis: ["messages"] },
@@ -290,6 +300,7 @@ test("OpenCode config treats models without capability metadata as authoritative
   );
 
   const result = await new OpenCodeConfigService(configPath).apply({
+    apiKey: "test-key",
     endpoint: "https://gateway.example.com",
     models: [{ id: "local-model" }],
     selected: "local-model",
@@ -317,6 +328,7 @@ test("OpenCode config keeps a saved label when the gateway sends an empty displa
   );
 
   await new OpenCodeConfigService(configPath).apply({
+    apiKey: "test-key",
     endpoint: "https://gateway.example.com",
     models: [{ id: "blank-name", displayName: "", apis: ["chat_completions"] }],
     selected: "blank-name",
@@ -338,6 +350,7 @@ test("OpenCode config keeps a pre-existing $schema value", async () => {
   );
 
   await new OpenCodeConfigService(configPath).apply({
+    apiKey: "test-key",
     endpoint: "https://gateway.example.com",
     models: [{ id: "chat-model", apis: ["chat_completions"] }],
     selected: "chat-model",

@@ -10,13 +10,14 @@ import { ClaudeConfigService } from "../dist/services/claude-config.js";
 import { OmpConfigService } from "../dist/services/omp-config.js";
 import { OpenCodeConfigService } from "../dist/services/opencode-config.js";
 
-test("Pi config merge is secret-free and uses private permissions", async () => {
+test("Pi config merge keeps other providers, writes the literal key, and uses private permissions", async () => {
   const directory = await mkdtemp(join(tmpdir(), "cli-hop-pi-"));
   const modelsPath = join(directory, "agent", "models.json");
   await mkdir(dirname(modelsPath), { recursive: true });
   await writeFile(modelsPath, '{\n  // keep provider\n  "providers": { "existing": {} }\n}\n');
 
   await new PiConfigService(modelsPath).apply({
+    apiKey: "test-key",
     endpoint: "https://gateway.example.com",
     models: [{ id: "model", apis: ["responses"] }],
     selected: "model",
@@ -25,8 +26,8 @@ test("Pi config merge is secret-free and uses private permissions", async () => 
   const raw = await readFile(modelsPath, "utf8");
   const config = JSON.parse(raw);
   assert.ok(config.providers.existing);
-  assert.equal(config.providers["cli-hop"].apiKey, "$CLI_HOP_API_KEY");
-  assert.equal(raw.includes("test-key"), false);
+  assert.equal(config.providers["cli-hop"].apiKey, "test-key");
+  assert.equal(raw.includes("CLI_HOP_API_KEY"), false);
   assert.equal((await stat(dirname(modelsPath))).mode & 0o777, 0o700);
   assert.equal((await stat(modelsPath)).mode & 0o777, 0o600);
 });
@@ -96,6 +97,7 @@ test("OMP config refuses an invalid providers value", async () => {
 
   await assert.rejects(
     new OmpConfigService(modelsPath).apply({
+      apiKey: "test-key",
       endpoint: "https://example.com",
       models: [{ id: "model" }],
       selected: "model",

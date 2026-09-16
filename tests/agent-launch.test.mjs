@@ -4,65 +4,47 @@ import test from "node:test";
 import { AgentService } from "../dist/services/agent.js";
 import { getAgentById } from "../dist/services/registry.js";
 
-test("Aider launch plan uses the CLI Hop OpenAI-compatible endpoint", () => {
-  const agent = getAgentById("aider");
+test("Claude Code launch plan forwards only the model arg and injects no env", () => {
+  const agent = getAgentById("claude-code");
   assert.ok(agent);
 
   const plan = new AgentService().createLaunchPlan(agent, {
-    model: "qwen-coder",
-    apiKey: "test-key",
-    baseUrl: "https://gateway.example.com",
+    model: "claude-opus",
   });
 
-  assert.equal(plan.command, "aider");
-  assert.deepEqual(plan.args, ["--model", "openai/qwen-coder"]);
-  assert.equal(plan.env.OPENAI_API_KEY, "test-key");
-  assert.equal(plan.env.OPENAI_API_BASE, "https://gateway.example.com/v1");
+  assert.equal(plan.command, "claude");
+  assert.deepEqual(plan.args, ["--model", "claude-opus"]);
+  assert.equal(plan.env.ANTHROPIC_API_KEY, undefined);
+  assert.equal(plan.env.ANTHROPIC_BASE_URL, undefined);
 });
 
-test("Codex launch plan uses per-invocation Responses provider overrides", () => {
+test("Codex launch plan forwards only the model and user args", () => {
   const agent = getAgentById("codex");
   assert.ok(agent);
 
   const plan = new AgentService().createLaunchPlan(agent, {
     model: "gpt-compatible",
-    apiKey: "test-key",
-    baseUrl: "https://gateway.example.com",
   });
 
   assert.equal(plan.command, "codex");
-  assert.deepEqual(plan.args, [
-    "--model",
-    "gpt-compatible",
-    "-c",
-    'model_provider="cli-hop"',
-    "-c",
-    'model_providers.cli-hop.name="CLI Hop"',
-    "-c",
-    'model_providers.cli-hop.base_url="https://gateway.example.com/v1"',
-    "-c",
-    'model_providers.cli-hop.env_key="CLI_HOP_API_KEY"',
-    "-c",
-    'model_providers.cli-hop.wire_api="responses"',
-  ]);
-  assert.equal(plan.env.CLI_HOP_API_KEY, "test-key");
+  assert.deepEqual(plan.args, ["--model", "gpt-compatible"]);
+  assert.equal(plan.env.CLI_HOP_API_KEY, undefined);
 });
 
-test("OpenCode launch plan uses the OpenAI-compatible provider and run subcommand", () => {
+test("OpenCode launch plan uses the run subcommand and injects no env", () => {
   const agent = getAgentById("opencode");
   assert.ok(agent);
 
   const plan = new AgentService().createLaunchPlan(agent, {
     model: "gpt-5.6-terra",
-    apiKey: "test-key",
-    baseUrl: "https://gateway.example.com",
     args: ["ตอบเพียง pong"],
   });
 
   assert.equal(plan.command, "opencode");
   assert.deepEqual(plan.args, ["run", "--model", "cli-hop/gpt-5.6-terra", "ตอบเพียง pong"]);
-  assert.equal(plan.env.CLI_HOP_API_KEY, "test-key");
+  assert.equal(plan.env.CLI_HOP_API_KEY, undefined);
 });
+
 test("Grok Build launch plan forwards only user args and keeps the key out of the environment", () => {
   const agent = getAgentById("grok");
   assert.ok(agent);
@@ -72,8 +54,6 @@ test("Grok Build launch plan forwards only user args and keeps the key out of th
   try {
     const plan = new AgentService().createLaunchPlan(agent, {
       model: "grok-4.5",
-      apiKey: "test-key",
-      baseUrl: "https://gateway.example.com",
       args: ["-p", "hello"],
     });
 
@@ -87,25 +67,24 @@ test("Grok Build launch plan forwards only user args and keeps the key out of th
   }
 });
 
-test("launch plan removes inherited credentials before injecting Settings values", () => {
-  const originalKey = process.env.OPENAI_API_KEY;
-  const originalBase = process.env.OPENAI_API_BASE;
-  process.env.OPENAI_API_KEY = "inherited-key";
-  process.env.OPENAI_API_BASE = "https://inherited.example.com";
+test("launch plan removes inherited credentials without injecting Settings values", () => {
+  const originalKey = process.env.ANTHROPIC_API_KEY;
+  const originalBase = process.env.ANTHROPIC_BASE_URL;
+  process.env.ANTHROPIC_API_KEY = "inherited-key";
+  process.env.ANTHROPIC_BASE_URL = "https://inherited.example.com";
   try {
-    const agent = getAgentById("aider");
+    const agent = getAgentById("claude-code");
     assert.ok(agent);
     const plan = new AgentService().createLaunchPlan(agent, {
-      apiKey: "settings-key",
-      baseUrl: "https://settings.example.com",
+      model: "claude-opus",
     });
-    assert.equal(plan.env.OPENAI_API_KEY, "settings-key");
-    assert.equal(plan.env.OPENAI_API_BASE, "https://settings.example.com/v1");
+    assert.equal(plan.env.ANTHROPIC_API_KEY, undefined);
+    assert.equal(plan.env.ANTHROPIC_BASE_URL, undefined);
   } finally {
-    if (originalKey === undefined) delete process.env.OPENAI_API_KEY;
-    else process.env.OPENAI_API_KEY = originalKey;
-    if (originalBase === undefined) delete process.env.OPENAI_API_BASE;
-    else process.env.OPENAI_API_BASE = originalBase;
+    if (originalKey === undefined) delete process.env.ANTHROPIC_API_KEY;
+    else process.env.ANTHROPIC_API_KEY = originalKey;
+    if (originalBase === undefined) delete process.env.ANTHROPIC_BASE_URL;
+    else process.env.ANTHROPIC_BASE_URL = originalBase;
   }
 });
 
@@ -117,8 +96,6 @@ test("missing agent executable reports an actionable installation error", async 
         id: "missing",
         name: "Missing Agent",
         command: "cli-hop-command-that-does-not-exist",
-        apiKeyEnvVars: [],
-        baseUrlEnvVars: [],
         supportedProtocols: ["chat_completions"],
         installUrl: "https://example.com/install",
       },
