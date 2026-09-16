@@ -5,6 +5,7 @@ import { runCommand } from "./commands/run.js";
 import { listCommand } from "./commands/list.js";
 import { customizeCommand } from "./commands/customize.js";
 import { settingsCommand } from "./commands/settings.js";
+import { checkCommand } from "./commands/check.js";
 import { updateCommand, performUpdate, startUpdateNotice } from "./commands/update.js";
 import { VERSION } from "./version.js";
 
@@ -23,6 +24,7 @@ program.addCommand(runCommand);
 program.addCommand(listCommand);
 program.addCommand(customizeCommand);
 program.addCommand(settingsCommand);
+program.addCommand(checkCommand);
 program.addCommand(updateCommand);
 
 // Default flow: opening `cli-hop` with no subcommand launches the

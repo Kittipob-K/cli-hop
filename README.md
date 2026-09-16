@@ -5,7 +5,7 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
 CLI for switching AI pools / models and configuring agent CLIs (Claude Code,
-Oh My Pi, Pi, Aider, OpenCode, Codex CLI, and Grok Build) to talk
+Oh My Pi, Pi, OpenCode, Codex CLI, and Grok Build) to talk
 to the **CLI Hop** gateway — with one primary API key that works across
 every agent.
 
@@ -16,7 +16,6 @@ $ cli-hop
   Claude Code
   Oh My Pi
   Pi
-  Aider
   OpenCode
   Codex CLI
   ← → switch tab · ↑↓ navigate · Enter select · Esc back
@@ -148,7 +147,7 @@ npm install -g cli-hop
 # Run interactive setup (will prompt for API key and base URL)
 cli-hop
 
-# Select your agent CLI (Claude Code, Oh My Pi, Pi, Aider, OpenCode, Codex, or Grok Build)
+# Select your agent CLI (Claude Code, Oh My Pi, Pi, OpenCode, Codex, or Grok Build)
 # Choose a model/pool from the list
 # The agent launches automatically with your configuration
 ```
@@ -168,6 +167,7 @@ cli-hop customize            # Same as default interactive mode
 cli-hop settings             # Edit API key / base URL in the Settings menu
 cli-hop list                 # List models from the CLI Hop API
 cli-hop list --local         # List built-in local pools only
+cli-hop check                # Verify the CLI Hop gateway connection (status only)
 ```
 
 ### Update the CLI
@@ -177,13 +177,25 @@ cli-hop --update             # Check npm and install the latest release
 # Alias: cli-hop update
 ```
 
+### Check the gateway connection
+
+`cli-hop check` performs a non-intrusive health check against the CLI Hop
+models API (Bearer key from Settings) and reports only the connection
+outcome — never the API key or any response body:
+
+```bash
+cli-hop check                # "Gateway reachable — N models available"
+```
+
+It distinguishes a rejected key (401), insufficient credits (402), other
+HTTP failures, and network errors, exiting non-zero on any failure.
+
 ### Launch specific agent
 
 ```bash
 cli-hop run -a claude-code   # Launch Claude Code
 cli-hop run -a omp           # Launch Oh My Pi
 cli-hop run -a pi            # Launch Pi
-cli-hop run -a aider         # Launch Aider
 cli-hop run -a opencode      # Launch OpenCode
 cli-hop run -a codex         # Launch Codex CLI
 cli-hop run -a grok          # Launch Grok Build (xAI CLI)
@@ -235,9 +247,9 @@ agent shortcut, and returns to the Settings menu.
    `ANTHROPIC_API_KEY` if not configured, saves them to Settings.
 4. **Fetch models** from `GET {baseURL}/models` and pick a pool.
 5. **Filter compatibility** using each model's advertised wire protocols.
-6. **Write agent config when required** — Claude Code, Oh My Pi, Pi,
-   OpenCode, Codex, and Grok Build receive merge-safe
-   configuration; Aider uses launch-time environment/arguments only.
+6. **Write agent config** — Claude Code, Oh My Pi, Pi,
+   OpenCode, Codex, and Grok Build each receive merge-safe
+   configuration carrying the key + endpoint, so they also work standalone.
 7. **Launch** the agent with a clean environment and remember it as `(latest)`.
 
 ## Agent compatibility
@@ -247,7 +259,6 @@ agent shortcut, and returns to the Settings menu.
 | Claude Code | `--model <model>` | `messages` | `~/.claude.json`, `~/.claude/settings.json` |
 | Oh My Pi | `--model cli-hop/<model>` | any advertised protocol | `~/.omp/agent/models.yml` |
 | Pi | `--model cli-hop/<model>` | any advertised protocol | `~/.pi/agent/models.json` |
-| Aider | `--model openai/<model>` | `chat_completions` | none |
 | OpenCode | `--model cli-hop/<model>` | `chat_completions` | `~/.config/opencode/opencode.json` (`cli-hop` provider + `model`/`small_model` refs) |
 | Codex CLI | `--model <model>` | `responses` | `~/.codex/config.toml`, `cli-hop.config.toml`, `auth.json` |
 | Grok Build | default from `~/.grok/config.toml` | `chat_completions` | `~/.grok/config.toml` (managed block, key inline) |

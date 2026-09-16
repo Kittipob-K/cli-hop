@@ -25,7 +25,7 @@ function run(command, args, options) {
   });
 }
 
-test("run launches Aider with paginated CLI Hop models and a clean environment", async (context) => {
+test("run launches Claude Code with paginated CLI Hop models and a clean environment", async (context) => {
   const root = await mkdtemp(join(tmpdir(), "cli-hop-e2e-"));
   const homeDir = join(root, "home");
   const configDir = join(root, "config");
@@ -47,9 +47,9 @@ test("run launches Aider with paginated CLI Hop models and a clean environment",
       return;
     }
     response.end(JSON.stringify({
-      data: [{ id: "chat-model" }],
+      data: [{ id: "claude-model" }],
       has_more: false,
-      "cli-hop": { models: { chat_completions: ["chat-model"] } },
+      "cli-hop": { models: { messages: ["claude-model"] } },
     }));
   });
   const address = await listen(server);
@@ -61,16 +61,16 @@ test("run launches Aider with paginated CLI Hop models and a clean environment",
     join(configDir, "cli-hop", "settings.json"),
     JSON.stringify({ apiKey: "e2e-key", baseUrl })
   );
-  const stubPath = join(binDir, "aider");
+  const stubPath = join(binDir, "claude");
   await writeFile(
     stubPath,
-    `#!/bin/sh\nnode -e 'const fs=require("node:fs"); fs.writeFileSync(process.env.CAPTURE_PATH, JSON.stringify({args:process.argv.slice(1),openaiKey:process.env.OPENAI_API_KEY,openaiBase:process.env.OPENAI_API_BASE,anthropicKey:process.env.ANTHROPIC_API_KEY ?? null}));' -- "$@"\n`
+    `#!/bin/sh\nnode -e 'const fs=require("node:fs"); fs.writeFileSync(process.env.CAPTURE_PATH, JSON.stringify({args:process.argv.slice(1),anthropicKey:process.env.ANTHROPIC_API_KEY ?? null,anthropicBase:process.env.ANTHROPIC_BASE_URL ?? null,authToken:process.env.ANTHROPIC_AUTH_TOKEN ?? null}));' -- "$@"\n`
   );
   await chmod(stubPath, 0o700);
 
   const result = await run(
     process.execPath,
-    ["dist/index.js", "run", "-a", "aider", "-p", "remote:chat-model"],
+    ["dist/index.js", "run", "-a", "claude-code", "-p", "remote:claude-model"],
     {
       cwd: process.cwd(),
       env: {
@@ -91,10 +91,10 @@ test("run launches Aider with paginated CLI Hop models and a clean environment",
 
   assert.equal(result.code, 0, result.stderr || result.stdout);
   const capture = JSON.parse(await readFile(capturePath, "utf8"));
-  assert.deepEqual(capture.args, ["--model", "openai/chat-model"]);
-  assert.equal(capture.openaiKey, "e2e-key");
-  assert.equal(capture.openaiBase, baseUrl);
+  assert.deepEqual(capture.args, ["--model", "claude-model"]);
   assert.equal(capture.anthropicKey, null);
+  assert.equal(capture.anthropicBase, null);
+  assert.equal(capture.authToken, null);
 });
 
 async function createFixture(context) {
@@ -112,12 +112,14 @@ async function createFixture(context) {
       data: [
         { id: "chat-model" },
         { id: "responses-model" },
+        { id: "claude-model" },
       ],
       has_more: false,
       "cli-hop": {
         models: {
           chat_completions: ["chat-model"],
           responses: ["responses-model"],
+          messages: ["claude-model"],
         },
       },
     }));
@@ -175,17 +177,17 @@ test("run syncs Pi config and launches the selected provider model", async (cont
   assert.equal(result.code, 0, result.stderr || result.stdout);
   const capture = JSON.parse(await readFile(fixture.capturePath, "utf8"));
   assert.deepEqual(capture.args, ["--model", "cli-hop/chat-model"]);
-  assert.equal(capture.cliHopKey, "e2e-key");
+  assert.equal(capture.cliHopKey, null);
   assert.equal(capture.anthropicKey, null);
   assert.equal(capture.openaiKey, null);
   assert.equal(capture.piDir, null);
   const config = JSON.parse(await readFile(piConfigPath, "utf8"));
   assert.equal(config.providers.existing.name, "Existing");
-  assert.equal(config.providers["cli-hop"].apiKey, "$CLI_HOP_API_KEY");
+  assert.equal(config.providers["cli-hop"].apiKey, "e2e-key");
   assert.deepEqual(config.providers["cli-hop"].models.map((model) => model.id), ["chat-model"]);
 });
 
-test("run syncs OpenCode without storing the primary key", async (context) => {
+test("run syncs OpenCode and writes the literal key", async (context) => {
   const fixture = await createFixture(context);
   await writeCaptureStub(fixture.binDir, "opencode");
 
@@ -199,8 +201,7 @@ test("run syncs OpenCode without storing the primary key", async (context) => {
   const capture = JSON.parse(await readFile(fixture.capturePath, "utf8"));
   assert.deepEqual(capture.args, ["--model", "cli-hop/chat-model"]);
   const raw = await readFile(join(fixture.configDir, "opencode", "opencode.json"), "utf8");
-  assert.equal(raw.includes("e2e-key"), false);
-  assert.equal(JSON.parse(raw).provider["cli-hop"].options.apiKey, "{env:CLI_HOP_API_KEY}");
+  assert.equal(JSON.parse(raw).provider["cli-hop"].options.apiKey, "e2e-key");
 });
 
 test("run removes OpenCode models the gateway no longer serves", async (context) => {
@@ -229,7 +230,7 @@ test("run removes OpenCode models the gateway no longer serves", async (context)
   assert.equal(config.provider["cli-hop"].models["retired-model"], undefined);
 });
 
-test("run launches Codex with Responses provider overrides", async (context) => {
+test("run launches Codex with only the model and user args", async (context) => {
   const fixture = await createFixture(context);
   await writeCaptureStub(fixture.binDir, "codex");
 
@@ -241,13 +242,10 @@ test("run launches Codex with Responses provider overrides", async (context) => 
 
   assert.equal(result.code, 0, result.stderr || result.stdout);
   const capture = JSON.parse(await readFile(fixture.capturePath, "utf8"));
-  assert.equal(capture.cliHopKey, "e2e-key");
+  assert.equal(capture.cliHopKey, null);
   assert.equal(capture.anthropicKey, null);
   assert.equal(capture.openaiKey, null);
-  assert.deepEqual(capture.args.slice(0, 2), ["--model", "responses-model"]);
-  assert.ok(capture.args.includes('model_provider="cli-hop"'));
-  assert.ok(capture.args.includes('model_providers.cli-hop.wire_api="responses"'));
-  assert.ok(capture.args.includes(`model_providers.cli-hop.base_url="${fixture.baseUrl}"`));
+  assert.deepEqual(capture.args, ["--model", "responses-model"]);
 });
 
 test("run writes the Grok managed config block and launches without a key env var", async (context) => {
@@ -323,4 +321,99 @@ test("model override uses the effective model protocol instead of the pool proto
   assert.equal(result.code, 0, result.stderr || result.stdout);
   const capture = JSON.parse(await readFile(fixture.capturePath, "utf8"));
   assert.deepEqual(capture.args.slice(0, 2), ["--model", "responses-model"]);
+});
+
+test("run configures Claude Code installer-parity config and launches with a clean env", async (context) => {
+  const fixture = await createFixture(context);
+  const stubPath = join(fixture.binDir, "claude");
+  await writeFile(
+    stubPath,
+    `#!/bin/sh\nnode -e 'const fs=require("node:fs"); fs.writeFileSync(process.env.CAPTURE_PATH, JSON.stringify({args:process.argv.slice(1),anthropicKey:process.env.ANTHROPIC_API_KEY ?? null,anthropicBase:process.env.ANTHROPIC_BASE_URL ?? null,authToken:process.env.ANTHROPIC_AUTH_TOKEN ?? null}));' -- "$@"\n`
+  );
+  await chmod(stubPath, 0o700);
+
+  const result = await run(
+    process.execPath,
+    ["dist/index.js", "run", "-a", "claude-code", "-p", "remote:claude-model"],
+    { cwd: process.cwd(), env: fixtureEnv(fixture), stdio: ["ignore", "pipe", "pipe"] }
+  );
+
+  assert.equal(result.code, 0, result.stderr || result.stdout);
+  const capture = JSON.parse(await readFile(fixture.capturePath, "utf8"));
+  assert.deepEqual(capture.args, ["--model", "claude-model"]);
+  assert.equal(capture.anthropicKey, null);
+  assert.equal(capture.anthropicBase, null);
+  assert.equal(capture.authToken, null);
+
+  const state = JSON.parse(await readFile(join(fixture.homeDir, ".claude.json"), "utf8"));
+  assert.equal(state.hasCompletedOnboarding, true);
+  assert.equal(state.bypassPermissionsModeAccepted, true);
+  assert.ok(state.customApiKeyResponses.approved.includes("e2e-key".slice(-20)));
+
+  const settings = JSON.parse(
+    await readFile(join(fixture.homeDir, ".claude", "settings.json"), "utf8")
+  );
+  assert.equal(settings.model, "claude-model");
+  assert.equal(settings.env.ANTHROPIC_BASE_URL, fixture.baseUrl.replace(/\/v1$/, ""));
+  assert.equal(settings.env.ANTHROPIC_API_KEY, "e2e-key");
+  assert.equal(settings.env.CLAUDE_CODE_ATTRIBUTION_HEADER, "0");
+  assert.equal(settings.env.ANTHROPIC_AUTH_TOKEN, undefined);
+  assert.equal(settings.hasCompletedOnboarding, true);
+});
+
+test("check reports a reachable gateway without exposing the key", async (context) => {
+  const fixture = await createFixture(context);
+
+  const result = await run(
+    process.execPath,
+    ["dist/index.js", "check"],
+    { cwd: process.cwd(), env: fixtureEnv(fixture), stdio: ["ignore", "pipe", "pipe"] }
+  );
+
+  assert.equal(result.code, 0, result.stderr || result.stdout);
+  assert.match(result.stdout, /Gateway reachable/);
+  assert.match(result.stdout, /3 models available/);
+  assert.equal(result.stdout.includes("e2e-key"), false);
+});
+
+test("check reports a rejected key and exits non-zero", async (context) => {
+  const fixture = await createFixture(context);
+  const server = http.createServer((request, response) => {
+    response.statusCode = 401;
+    response.setHeader("content-type", "application/json");
+    response.end(JSON.stringify({ error: "unauthorized" }));
+  });
+  const address = await listen(server);
+  context.after(() => server.close());
+  await writeFile(
+    join(fixture.configDir, "cli-hop", "settings.json"),
+    JSON.stringify({ apiKey: "bad-key", baseUrl: `http://127.0.0.1:${address.port}/v1` })
+  );
+
+  const result = await run(
+    process.execPath,
+    ["dist/index.js", "check"],
+    { cwd: process.cwd(), env: fixtureEnv(fixture), stdio: ["ignore", "pipe", "pipe"] }
+  );
+
+  assert.equal(result.code, 1);
+  assert.match(result.stderr, /rejected \(401\)/);
+  assert.equal(result.stderr.includes("bad-key"), false);
+});
+
+test("check degrades gracefully without an API key", async (context) => {
+  const fixture = await createFixture(context);
+  await writeFile(
+    join(fixture.configDir, "cli-hop", "settings.json"),
+    JSON.stringify({ baseUrl: fixture.baseUrl })
+  );
+
+  const result = await run(
+    process.execPath,
+    ["dist/index.js", "check"],
+    { cwd: process.cwd(), env: fixtureEnv(fixture), stdio: ["ignore", "pipe", "pipe"] }
+  );
+
+  assert.equal(result.code, 1);
+  assert.match(result.stdout, /No API key configured/);
 });

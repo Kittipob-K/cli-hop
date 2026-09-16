@@ -68,10 +68,13 @@ export class PoolService {
       });
 
       if (!res.ok) {
-        throw new Error(
+        const error = new Error(
           `Models API returned ${res.status} ${res.statusText}` +
-            (res.status === 401 ? " — check your API key in Settings" : "")
-        );
+            (res.status === 401 ? " — check your API key in Settings" : "") +
+            (res.status === 402 ? " — insufficient credits" : "")
+        ) as Error & { status?: number };
+        error.status = res.status;
+        throw error;
       }
 
       const body: unknown = await res.json();
