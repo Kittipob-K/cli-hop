@@ -18,4 +18,4 @@ Unknown capabilities remain visible as unsupported until an agent adapter suppor
 
 Generated agent configuration treats the current input catalogue as authoritative. Entries no longer present are removed rather than copied back from an older configuration, including when the current models omit capability metadata. Settings and display labels for model IDs that remain in the catalogue are preserved.
 
-When metadata is absent, protocol-specific adapters accept their configured wire as the conservative fallback. GPT/Codex use OpenAI Responses, Claude uses Anthropic Messages, and Aider, Oh My Pi, Pi, OpenCode, and Grok Build use Chat Completions. Explicitly advertised capabilities always take precedence.
+When metadata is absent, protocol-specific adapters accept their configured wire as the conservative fallback. GPT/Codex use OpenAI Responses, Claude uses Anthropic Messages, and Oh My Pi, Pi, OpenCode, and Grok Build use Chat Completions. Explicitly advertised capabilities always take precedence.

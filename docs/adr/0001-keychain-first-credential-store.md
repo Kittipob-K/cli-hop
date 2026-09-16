@@ -23,8 +23,10 @@ keychain and removes it from the file (no migration script).
 
 - "No plaintext secrets anywhere" was deliberately **not** achieved: Agent
   Configs (e.g. `~/.claude/settings.json`, 0600) still carry a derived copy so
-  that launching `claude` directly keeps working — installer parity is a
-  product promise. The store is the single *input*, not the single copy.
+  that launching the agent directly keeps working — installer parity is a
+  product promise. The store is the single *input*, not the single copy. As of
+  ADR 0003 the Agent Config is the *only* delivery channel (no launch-time env
+  injection).
 - Error handling degrades rather than dead-ends: if the keychain cannot be
   reached or read (macOS access prompt denied — unsigned `node` gets prompted
   for items it didn't create), reads fall back to the Settings File, and writes
@@ -38,5 +40,6 @@ keychain and removes it from the file (no migration script).
   wipe the key through an unrelated settings write.
 - Keychain item identity: service `cli-hop`, account = login username.
 - Key rotation propagates to Agent Configs on the next wrapper launch (that
-  flow already re-applies them); the post-save message tells the user to run
-  `cli-hop <agent>` once after changing the key.
+  flow already re-applies them) or via the Settings Resync action (ADR 0003);
+  the post-save message tells the user to run `cli-hop <agent>` once after
+  changing the key.

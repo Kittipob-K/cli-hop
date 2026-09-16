@@ -1,13 +1,14 @@
 # cli-hop
 
-CLI that launches agent CLIs against the CLI Hop gateway using one
-user-configured credential.
+CLI that launches agent CLIs against the CLI Hop gateway. One credential
+is configured once and delivered to each agent through its own config file.
 
 ## Language
 
 **Primary API Key**:
-The single CLI Hop key the user configures once; every supported agent CLI is
-launched with it.
+The single CLI Hop key the user configures once; every supported agent CLI
+authenticates to the gateway with it, delivered through each Agent Config.
+No launch-time env injection.
 _Avoid_: token, secret, password
 
 **Credential Store**:
@@ -24,8 +25,10 @@ _Avoid_: config, profile
 
 **Agent Config**:
 A per-agent file the tool writes so that agent talks to CLI Hop when launched
-directly. Always a *derived copy* of the Credential Store + Settings File —
-never an independent input, and freely overwritten or removed by the tool.
+directly — the sole delivery channel for the Primary API Key and endpoint. It
+is always a *derived copy* of the Credential Store + Settings File — never an
+independent input, freely overwritten or removed by the tool, and never
+bypassed by launch-time environment variables.
 _Avoid_: credential (it may contain one, but it is not where one is entered)
 # Model capabilities and wire selection
 

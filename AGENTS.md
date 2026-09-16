@@ -35,6 +35,7 @@ src/
     settings.ts         API key / base URL / reset actions + `cli-hop settings`
     run.ts              non-interactive launch: cli-hop run [-p pool] [-m model] [-- args]
     list.ts             model list (remote, --local fallback)
+    check.ts            `cli-hop check` non-intrusive gateway health check
     update.ts           `--update` self-update flow + passive "update available" notice
   services/
     settings.ts         SettingsService: Credential Store — keychain-first API key, base URL,
@@ -63,18 +64,22 @@ src/
     secure-file.ts      atomic 0600 writes + managed-directory permissions
     installer.ts        isInstalled() PATH scan + AGENT_INSTALL_SPECS official
                         per-platform installers + ensureAgentInstalled() prompt
-    registry.ts         agent adapters: env, protocols, args, config preparation
+    resync.ts           ResyncService: rewrite installed agents' existing configs
+                        with the current key/endpoint, preserving each model
+    registry.ts         agent adapters: unset rules, protocols, args, config preparation
 ```
 
 ### Core invariants (do not break)
 
 1. **Unset before export.** `AgentService.applyUnset()` removes inherited
-   Anthropic/OpenAI/CLI Hop proxy credentials from `process.env`, then
-   `prepareEnv()` re-injects only Settings values into the child env. The
-   child process must never see inherited proxy credentials.
-2. **One key, all agents.** The primary API key is injected using each registry
-   entry's `apiKeyEnvVars` / `baseUrlEnvVars`. Never hardcode agent env names in
-   commands.
+   Anthropic/OpenAI/CLI Hop proxy credentials from `process.env` before any
+   agent spawn. The child process must never see inherited proxy credentials;
+   the key it needs comes from its own Agent Config, not the environment.
+2. **One key, delivered via each Agent Config.** The primary API key is
+   written into each agent's own config file (0600, ADR 0003) so agents run
+   standalone without the wrapper. `cli-hop run` never injects env vars —
+   it only unsets inherited credentials and spawns. Never hardcode agent env
+   names in commands.
 3. **Settings are the single source of truth.** Anything the flow needs
    (baseUrl, apiKey) must come from `SettingsService` (via
    `ensurePrerequisites` in interactive flows), never from `process.env`.
@@ -104,8 +109,9 @@ src/
 ## Adding a new agent CLI
 
 1. Add one `Agent` adapter to `CUSTOMIZABLE_AGENTS` in
-   `src/services/registry.ts`: command, env mapping, supported protocols, model
-   argument behavior, and optional `prepare` config writer.
+   `src/services/registry.ts`: command, unset rules, supported protocols, model
+   argument behavior, and the required `prepare` config writer. Every agent
+   must have a config writer — launch-time env injection was removed (ADR 0003).
 2. Do not add agent-specific branches to `run.ts` or `customize.ts`; shared
    pool, preparation, and launch policy belongs in `LaunchCoordinator`, while
    agent-specific behavior stays behind `AgentService` and registry adapters.
@@ -141,3 +147,17 @@ real config:
 - `dist/`, `node_modules/`, `.recall/`, `.DS_Store` are git-ignored; don't
   commit build output.
 - Conventional commits (`feat:` / `fix:` / `chore:`), small focused commits.
+
+## Agent skills
+
+### Issue tracker
+
+Issues/specs live as markdown files under `.scratch/<feature>/` (local tracker). See `docs/agents/issue-tracker.md`.
+
+### Triage labels
+
+Five canonical roles map 1:1 to their label strings (`needs-triage`, `needs-info`, `ready-for-agent`, `ready-for-human`, `wontfix`), recorded as `Status:` lines in each issue file. See `docs/agents/triage-labels.md`.
+
+### Domain docs
+
+Single-context: root `CONTEXT.md` + `docs/adr/`. See `docs/agents/domain.md`.
