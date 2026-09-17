@@ -1,6 +1,6 @@
 {
   "name": "cli-hop",
-  "version": "0.1.8",
+  "version": "0.1.9",
   "description": "CLI tool for switching AI pools based on selected models",
   "engines": {
     "node": ">=22"
