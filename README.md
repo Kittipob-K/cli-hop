@@ -23,12 +23,13 @@ $ cli-hop
   AGENTS    [ SETTINGS ]
 ❯ API Key: Change ccsk…26f3
   Base URL: https://api.cli-hop.cc/v1
+  Resync agent configs
   Reset API key and Base URL
   ← → switch tab · ↑↓ navigate · Enter select · Esc back
 
 ── Customizing Claude Code ────────────────────────────────────────────
-✔ ANTHROPIC_API_KEY=ccsk…26f3 (primary API key)
-✔ ANTHROPIC_BASE_URL=https://api.cli-hop.cc
+  unset ANTHROPIC_API_KEY ANTHROPIC_BASE_URL …
+  credentials delivered via Claude Code's config — no env export
 ✔ 4 models loaded from API
 ? Select a model/pool:
 ❯ qwen3.8-flash (qwen3.8-flash)
@@ -45,23 +46,23 @@ $ cli-hop
 - **Clean environment per launch** — inherited Anthropic, OpenAI, and CLI Hop
   credentials (including `ANTHROPIC_*`, `OPENAI_*`, and
   `CLI_HOP_API_KEY`) are unset first, so the agent always starts from
-  cli-hop-managed state.
-- **One primary API key for every agent CLI** — the key you save in Settings is
-  exported into the env vars each agent reads. Inherited Anthropic, OpenAI, and
-  CLI Hop proxy credentials are removed first so only Settings values reach the
-  child process.
+  cli-hop-managed state. Nothing is injected back into the environment.
+- **One primary API key, delivered through each agent's own config** — the key
+  you save in Settings is written literally into every agent's config file
+  (created `0600`), so each agent runs standalone without the wrapper and
+  without depending on inherited env vars.
 - **Protocol-aware selection** — models are matched to agents using the gateway's
   advertised `messages`, `chat_completions`, and `responses`
   capabilities. Unsupported model/agent combinations are hidden or rejected
   before launch.
 - **Oh My Pi model sync** — every selection rewrites the `cli-hop` provider in
   `~/.omp/agent/models.yml` with models available through OpenAI Chat
-  Completions, using `openai-completions` for every entry. The key itself stays
-  off disk (`CLI_HOP_API_KEY` env).
+  Completions, using `openai-completions` for every entry. The primary key is
+  written inline in the provider block (`0600`).
 - **Pi model sync** — every Pi launch merge-writes the Chat Completions
   catalogue into `~/.pi/agent/models.json` under provider `cli-hop`, then starts
-  Pi with `--model cli-hop/<model>`. Its config stores only
-  `$CLI_HOP_API_KEY`, never the primary key itself.
+  Pi with `--model cli-hop/<model>`. The primary key is written inline in the
+  provider block (`0600`).
 - **OpenCode model sync** — merge-writes
   `~/.config/opencode/opencode.json` with one `@ai-sdk/openai-compatible`
   provider named `cli-hop`. Only models compatible with Chat Completions are
@@ -70,7 +71,7 @@ $ cli-hop
   CLI Hop model entries that are no longer returned are removed even when
   capability metadata is absent. Saved settings and labels for models still in
   the catalogue are preserved, as are unrelated providers and top-level
-  options. The key is referenced as `{env:CLI_HOP_API_KEY}`, never stored, and
+  options. The primary key is written inline in the provider `options`, and
   `$schema` is added only when the file is newly created. Forwarded prompts use
   `opencode run` so OpenCode treats them as non-interactive prompts rather than
   directory arguments.
@@ -101,12 +102,18 @@ $ cli-hop
 - **Codex installer-parity config** — deploys `~/.codex/config.toml`
   (marker-managed regions merged into your existing config),
   `~/.codex/cli-hop.config.toml`, and `~/.codex/auth.json` (0600) so `codex`
-  works standalone, plus per-run `-c` provider overrides at launch.
+  works standalone. The provider and endpoint live in the deployed config, so
+  launch only passes `--model` plus your own arguments.
 - **Grok Build configuration (installer parity)** — merge-writes a
   marker-delimited `[model]` block into `~/.grok/config.toml` (Responses wire,
   pool base URL, key inline at 0600) plus the `[models]` / `[endpoints]` /
   `[marketplace]` defaults the official CLI Hop Grok installer writes, and can
   scrub legacy `CLI_HOP_*` exports from your shell rc files.
+- **Resync agent configs** — a Settings action that rewrites every *installed*
+  agent that already has a config with the current key and endpoint. Each
+  agent's existing model selection is preserved (falling back to the first
+  model it supports from the catalogue), and one agent failing never aborts the
+  others.
 - **Update check** — a once-per-day background check against the npm registry
   prints an `Update available` notice (never blocking or crashing the flow);
   run `cli-hop --update` to self-update via `npm install -g`. Set
@@ -234,17 +241,19 @@ cli-hop
 | `Enter` | Select the highlighted agent or settings action. |
 | `Esc` | From SETTINGS, return to AGENTS; from AGENTS, exit the CLI. |
 
-The **SETTINGS** tab provides direct actions for **API Key**, **Base URL**, and
-**Reset API key and Base URL**. Reset asks for confirmation, keeps the last-used
-agent shortcut, and returns to the Settings menu.
+The **SETTINGS** tab provides direct actions for **API Key**, **Base URL**,
+**Resync agent configs**, and **Reset API key and Base URL**. Resync rewrites
+the key/endpoint into every installed agent that already has a config; Reset
+asks for confirmation, keeps the last-used agent shortcut, and returns to the
+Settings menu.
 
 ### The customize flow
 
 1. **Choose an agent** — use the *AGENTS* tab; the most recently launched agent
    appears first as `(latest)`.
 2. **Unset** inherited credential env vars.
-3. **Check prerequisites** — prompts for `ANTHROPIC_BASE_URL` and
-   `ANTHROPIC_API_KEY` if not configured, saves them to Settings.
+3. **Check prerequisites** — prompts for the base URL and primary API key if
+   not configured, saves them to Settings.
 4. **Fetch models** from `GET {baseURL}/models` and pick a pool.
 5. **Filter compatibility** using each model's advertised wire protocols.
 6. **Write agent config** — Claude Code, Oh My Pi, Pi,
@@ -257,9 +266,9 @@ agent shortcut, and returns to the Settings menu.
 | Agent | Model selector | Required CLI Hop protocol | Persistent config |
 | --- | --- | --- | --- |
 | Claude Code | `--model <model>` | `messages` | `~/.claude.json`, `~/.claude/settings.json` |
-| Oh My Pi | `--model cli-hop/<model>` | any advertised protocol | `~/.omp/agent/models.yml` |
-| Pi | `--model cli-hop/<model>` | any advertised protocol | `~/.pi/agent/models.json` |
-| OpenCode | `--model cli-hop/<model>` | `chat_completions` | `~/.config/opencode/opencode.json` (`cli-hop` provider + `model`/`small_model` refs) |
+| Oh My Pi | `--model cli-hop/<model>` | `chat_completions` | `~/.omp/agent/models.yml` (key inline) |
+| Pi | `--model cli-hop/<model>` | `chat_completions` | `~/.pi/agent/models.json` (key inline) |
+| OpenCode | `--model cli-hop/<model>` | `chat_completions` | `~/.config/opencode/opencode.json` (`cli-hop` provider + `model`/`small_model` refs, key inline) |
 | Codex CLI | `--model <model>` | `responses` | `~/.codex/config.toml`, `cli-hop.config.toml`, `auth.json` |
 | Grok Build | default from `~/.grok/config.toml` | `chat_completions` | `~/.grok/config.toml` (managed block, key inline) |
 
@@ -284,7 +293,7 @@ automatically. Set `CLI_HOP_DISABLE_KEYCHAIN=1` to force file-only storage:
 
 | Field     | Purpose                                                                                                                                                                           |
 | --------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `apiKey`  | Primary API key — Bearer token for the models API and exported to every agent CLI. Present in this file only on keychain-less systems; otherwise the key lives in the OS keychain. |
+| `apiKey`  | Primary API key — Bearer token for the models API and written literally into each agent's own config (0600). Present in this file only on keychain-less systems; otherwise the key lives in the OS keychain. |
 | `baseUrl` | CLI Hop models endpoint including `/v1`; cli-hop normalizes it for each agent's protocol. Default: `https://api.cli-hop.cc/v1`.                                              |
 | `lastAgentId` | ID of the most recently launched interactive agent; used to put it first in the AGENTS tab. No credential data is stored in this field. |
 
