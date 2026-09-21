@@ -5,19 +5,21 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 import {
-  AGENT_INSTALL_SPECS,
   currentPlatformKey,
   displayInstallCommand,
-  installSpecFor,
   isInstalled,
   runInstallCommand,
 } from "../dist/services/installer.js";
-import { CUSTOMIZABLE_AGENTS } from "../dist/services/registry.js";
+import {
+  CUSTOMIZABLE_AGENTS,
+  getAgentById,
+  installSpecFor,
+} from "../dist/services/registry.js";
 
 test("every registered agent has an install spec for all three platforms", () => {
   for (const agent of CUSTOMIZABLE_AGENTS) {
-    const spec = AGENT_INSTALL_SPECS[agent.id];
-    assert.ok(spec, `${agent.id} missing from AGENT_INSTALL_SPECS`);
+    const spec = agent.installSpec;
+    assert.ok(spec, `${agent.id} missing its installSpec`);
   for (const platform of ["macos", "linux", "windows"]) {
       const command = spec[platform];
       assert.ok(command, `${agent.id} has no ${platform} install command`);
@@ -36,7 +38,7 @@ test("install specs use the official commands from each agent's docs", () => {
     grok: "https://x.ai/cli/install.sh",
   };
   for (const [agentId, url] of Object.entries(official)) {
-    const display = displayInstallCommand(AGENT_INSTALL_SPECS[agentId].macos);
+    const display = displayInstallCommand(getAgentById(agentId).installSpec.macos);
     assert.ok(
       display.includes(`curl -fsSL ${url}`),
       `${agentId} macOS should curl ${url}, got: ${display}`
@@ -45,7 +47,7 @@ test("install specs use the official commands from each agent's docs", () => {
   // OpenCode is installed from its npm package on every supported platform,
   // and its postinstall script must run to download the native binary.
   for (const platform of ["macos", "linux", "windows"]) {
-    const display = displayInstallCommand(AGENT_INSTALL_SPECS.opencode[platform]);
+    const display = displayInstallCommand(getAgentById("opencode").installSpec[platform]);
     assert.match(display, /npm install -g opencode-ai/);
     assert.match(
       display,
@@ -55,16 +57,16 @@ test("install specs use the official commands from each agent's docs", () => {
   // Windows routes go through PowerShell one-liners; pi routes through npm
   // with the officially documented --ignore-scripts flag.
   assert.match(
-    displayInstallCommand(AGENT_INSTALL_SPECS["claude-code"].windows),
+    displayInstallCommand(getAgentById("claude-code").installSpec.windows),
     /irm https:\/\/claude\.ai\/install\.ps1 \| iex/
   );
   assert.match(
-    displayInstallCommand(AGENT_INSTALL_SPECS.pi.macos),
+    displayInstallCommand(getAgentById("pi").installSpec.macos),
     /npm install -g --ignore-scripts @earendil-works\/pi-coding-agent/
   );
   // xAI has no npm package — never offer the third-party grok-cli.
   assert.ok(
-    !JSON.stringify(AGENT_INSTALL_SPECS.grok).includes("grok-cli"),
+    !JSON.stringify(getAgentById("grok").installSpec).includes("grok-cli"),
     "grok spec must not reference the third-party grok-cli package"
   );
 });

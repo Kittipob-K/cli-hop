@@ -5,7 +5,7 @@ import type { ChildProcessByStdio } from "node:child_process";
 import { spawn } from "node:child_process";
 import type { Readable } from "node:stream";
 import { confirm } from "@inquirer/prompts";
-import type { Agent } from "../types.js";
+import type { Agent, InstallCommand, InstallStep } from "../types.js";
 import * as ui from "../ui.js";
 /**
  * Install commands are the verbatim one-liners from each agent's official
@@ -16,38 +16,6 @@ import * as ui from "../ui.js";
 
 /** The platforms cli-hop distinguishes for install commands. */
 export type PlatformKey = "macos" | "linux" | "windows";
-
-/**
- * A structured execution plan for one official install command. Commands that
- * are shell pipelines in the official docs (`curl … | bash`, `irm … | iex`)
- * run by handing the verbatim command string to the interpreter as a single
- * argument — no user input is ever interpolated, and argv stays an array
- * (DEP0190-safe, invariant 5).
- */
-export type InstallStep =
-  /** `curl -fsSL <url> | bash` / `… | sh` — verbatim POSIX one-liner. */
-  | { kind: "script"; shell: "bash" | "sh"; command: string }
-  /** `irm <url> | iex` — verbatim PowerShell one-liner. */
-  | { kind: "powershell"; command: string }
-  /** `npm <args...>` — npm global install (npm resolved per platform). */
-  | { kind: "npm"; args: readonly string[] }
-  /** Run steps in order; stops at the first failure (docs' `a && b`). */
-  | { kind: "sequential"; steps: readonly InstallStep[] };
-
-/** One official install command: display string + structured exec plan. */
-export interface InstallCommand {
-  /** Execution plan. */
-  readonly steps: readonly InstallStep[];
-}
-
-/** Official install instructions for one agent on one platform. */
-export interface AgentInstallSpec {
-  readonly macos?: InstallCommand;
-  readonly linux?: InstallCommand;
-  readonly windows?: InstallCommand;
-  /** Docs URL printed when the user declines or installation fails. */
-  readonly docsUrl: string;
-}
 
 /** Human-readable rendering of a step (shown in the spinner). */
 function describeStep(step: InstallStep): string {
@@ -83,17 +51,17 @@ export function displayInstallCommand(command: InstallCommand): string {
   return parts.join(" && ");
 }
 
-/** Helpers keeping the spec table readable. */
-const curlPipe = (url: string, shell: "bash" | "sh"): InstallCommand => ({
+/** Helpers keeping the agent install-spec table readable. */
+export const curlPipe = (url: string, shell: "bash" | "sh"): InstallCommand => ({
   steps: [{ kind: "script", shell, command: `curl -fsSL ${url} | ${shell}` }],
 });
-const irmPipe = (url: string): InstallCommand => ({
+export const irmPipe = (url: string): InstallCommand => ({
   steps: [{ kind: "powershell", command: `irm ${url} | iex` }],
 });
-const npmGlobal = (...pkgs: readonly string[]): InstallCommand => ({
+export const npmGlobal = (...pkgs: readonly string[]): InstallCommand => ({
   steps: [{ kind: "npm", args: ["install", "-g", ...pkgs] }],
 });
-const npmGlobalWithPostinstall = (...pkgs: readonly string[]): InstallCommand => ({
+export const npmGlobalWithPostinstall = (...pkgs: readonly string[]): InstallCommand => ({
   steps: [
     { kind: "npm", args: ["install", "-g", ...pkgs] },
     {
@@ -103,54 +71,6 @@ const npmGlobalWithPostinstall = (...pkgs: readonly string[]): InstallCommand =>
     },
   ],
 });
-
-/**
- * Official install command spec per agent id. Every CUSTOMIZABLE_AGENTS entry
- * must appear here (enforced by tests) — `installSpecFor` degrades to the
- * docs URL when a platform has no verified command.
- */
-export const AGENT_INSTALL_SPECS: Record<string, AgentInstallSpec> = {
-  "claude-code": {
-    macos: curlPipe("https://claude.ai/install.sh", "bash"),
-    linux: curlPipe("https://claude.ai/install.sh", "bash"),
-    windows: irmPipe("https://claude.ai/install.ps1"),
-    docsUrl: "https://code.claude.com/docs/en/setup",
-  },
-  omp: {
-    macos: curlPipe("https://omp.sh/install", "sh"),
-    linux: curlPipe("https://omp.sh/install", "sh"),
-    windows: irmPipe("https://omp.sh/install.ps1"),
-    docsUrl: "https://github.com/can1357/oh-my-pi",
-  },
-  pi: {
-    macos: npmGlobal("--ignore-scripts", "@earendil-works/pi-coding-agent"),
-    linux: npmGlobal("--ignore-scripts", "@earendil-works/pi-coding-agent"),
-    windows: npmGlobal("--ignore-scripts", "@earendil-works/pi-coding-agent"),
-    docsUrl: "https://pi.dev/docs/latest",
-  },
-  opencode: {
-    // OpenCode's npm package ships a stub that requires its postinstall script
-    // to download the platform-specific native binary. Re-run postinstall.mjs
-    // after the global install so the real `bin/opencode.exe` is produced.
-    macos: npmGlobalWithPostinstall("opencode-ai"),
-    linux: npmGlobalWithPostinstall("opencode-ai"),
-    windows: npmGlobalWithPostinstall("opencode-ai"),
-    docsUrl: "https://opencode.ai/docs/",
-  },
-  codex: {
-    macos: curlPipe("https://chatgpt.com/codex/install.sh", "sh"),
-    linux: curlPipe("https://chatgpt.com/codex/install.sh", "sh"),
-    windows: irmPipe("https://chatgpt.com/codex/install.ps1"),
-    docsUrl: "https://developers.openai.com/codex/cli/",
-  },
-  grok: {
-    macos: curlPipe("https://x.ai/cli/install.sh", "bash"),
-    linux: curlPipe("https://x.ai/cli/install.sh", "bash"),
-    // xAI ships no npm package — the npm `grok-cli` is third-party, never offered.
-    windows: irmPipe("https://x.ai/cli/install.ps1"),
-    docsUrl: "https://docs.x.ai/build/overview",
-  },
-};
 
 /** Map the running platform to a PlatformKey; undefined on exotic systems. */
 export function currentPlatformKey(): PlatformKey | undefined {
@@ -164,20 +84,6 @@ export function currentPlatformKey(): PlatformKey | undefined {
     default:
       return undefined;
   }
-}
-
-/**
- * The install spec for the running platform, or undefined when cli-hop has
- * no verified install command there — the flow then degrades to the docs URL.
- */
-export function installSpecFor(
-  agentId: string,
-  platform: PlatformKey | undefined = currentPlatformKey()
-): AgentInstallSpec | undefined {
-  const spec = AGENT_INSTALL_SPECS[agentId];
-  if (!spec || !platform) return undefined;
-  const command = spec[platform];
-  return command ? spec : undefined;
 }
 
 /** Windows executable extensions probed when scanning PATH. */
@@ -336,19 +242,20 @@ function printOutputTail(output: string, lines = 5): void {
 export async function ensureAgentInstalled(agent: Agent): Promise<boolean> {
   if (await isInstalled(agent.command)) return true;
 
-  const spec = installSpecFor(agent.id);
+  const platform = currentPlatformKey();
+  const spec = agent.installSpec;
   ui.warn(
     `${agent.name} (${ui.code(agent.command)}) is not installed or not on PATH.`
   );
 
-  if (!spec) {
+  if (!spec || !platform || !spec[platform]) {
     const url = agent.installUrl ?? "";
     if (url) ui.muted(`  Install it manually: ${ui.url(url)}`);
     return false;
   }
 
-  const command = spec[currentPlatformKey()!]!;
-  ui.info(`Official ${agent.name} installer for ${currentPlatformKey()}:`);
+  const command = spec[platform]!;
+  ui.info(`Official ${agent.name} installer for ${platform}:`);
   ui.muted(`  ${displayInstallCommand(command)}`);
 
   if (!process.stdin.isTTY) {

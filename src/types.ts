@@ -99,6 +99,44 @@ export interface Agent {
   /** Optional cleanup offered only in the interactive customize flow. */
   scrubShellConfig?: () => Promise<string[]>;
   installUrl?: string;
+  /**
+   * Official installer spec per platform (verbatim one-liners from the
+   * agent's docs); the flow degrades to the docs URL when a platform has
+   * no verified command.
+   */
+  installSpec?: AgentInstallSpec;
+}
+
+/**
+ * A structured execution plan for one official install command. Commands that
+ * are shell pipelines in the official docs (`curl … | bash`, `irm … | iex`)
+ * run by handing the verbatim command string to the interpreter as a single
+ * argument — no user input is ever interpolated, and argv stays an array
+ * (DEP0190-safe, invariant 5).
+ */
+export type InstallStep =
+  /** `curl -fsSL <url> | bash` / `… | sh` — verbatim POSIX one-liner. */
+  | { kind: "script"; shell: "bash" | "sh"; command: string }
+  /** `irm <url> | iex` — verbatim PowerShell one-liner. */
+  | { kind: "powershell"; command: string }
+  /** `npm <args...>` — npm global install (npm resolved per platform). */
+  | { kind: "npm"; args: readonly string[] }
+  /** Run steps in order; stops at the first failure (docs' `a && b`). */
+  | { kind: "sequential"; steps: readonly InstallStep[] };
+
+/** One official install command: structured exec plan. */
+export interface InstallCommand {
+  /** Execution plan. */
+  readonly steps: readonly InstallStep[];
+}
+
+/** Official install instructions for one agent on one platform. */
+export interface AgentInstallSpec {
+  readonly macos?: InstallCommand;
+  readonly linux?: InstallCommand;
+  readonly windows?: InstallCommand;
+  /** Docs URL printed when the user declines or installation fails. */
+  readonly docsUrl: string;
 }
 
 /** What the Resync action needs to know about an agent's existing config. */

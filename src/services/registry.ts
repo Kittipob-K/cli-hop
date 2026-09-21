@@ -15,7 +15,36 @@ import { OmpConfigService } from "./omp-config.js";
 import { OpenCodeConfigService } from "./opencode-config.js";
 import { PiConfigService } from "./pi-config.js";
 import { scrubShellRc } from "./shell-scrub.js";
+import {
+  curlPipe,
+  irmPipe,
+  npmGlobal,
+  npmGlobalWithPostinstall,
+} from "./installer.js";
 import * as ui from "../ui.js";
+
+/** Upstream context windows recorded in managed configs; catalogue facts. */
+const MODEL_CONTEXT_WINDOWS: Record<string, number> = {
+  "grok-4.5": 1000000,
+};
+
+/** Codex rc-scrub list: the adapter's envToUnset, scrubbed at the shell too. */
+const CODEX_SCRUB_VARS = [
+  "CODEX_API_KEY",
+  "CODEX_ACCESS_TOKEN",
+  "OPENAI_BASE_URL",
+  "OPENAI_API_KEY",
+];
+
+/** Grok rc-scrub list: legacy installer exports plus the gateway key. */
+const GROK_SCRUB_VARS = [
+  "CLI_HOP_API_KEY",
+  "CLI_HOP_AI_API_KEY",
+  "CLI_HOP_CODEX_API_KEY",
+  "CLI_HOP_OC_CODEX_API_KEY",
+  "CLI_HOP_HERMES_CODEX_API_KEY",
+  "CUSTOM_API_KEY",
+];
 
 /**
  * Registry of agent CLIs that can be customized through cli-hop.
@@ -35,6 +64,12 @@ export const CUSTOMIZABLE_AGENTS: Agent[] = [
     probeConfig: () => new ClaudeConfigService().probe(),
     scrubShellConfig: () => new ClaudeConfigService().scrubShellRc(),
     installUrl: "https://docs.anthropic.com/en/docs/claude-code",
+    installSpec: {
+      macos: curlPipe("https://claude.ai/install.sh", "bash"),
+      linux: curlPipe("https://claude.ai/install.sh", "bash"),
+      windows: irmPipe("https://claude.ai/install.ps1"),
+      docsUrl: "https://code.claude.com/docs/en/setup",
+    },
   },
   {
     id: "omp",
@@ -52,6 +87,12 @@ export const CUSTOMIZABLE_AGENTS: Agent[] = [
     ],
     probeConfig: () => new OmpConfigService().probe(),
     installUrl: "https://github.com/can1357/oh-my-pi",
+    installSpec: {
+      macos: curlPipe("https://omp.sh/install", "sh"),
+      linux: curlPipe("https://omp.sh/install", "sh"),
+      windows: irmPipe("https://omp.sh/install.ps1"),
+      docsUrl: "https://github.com/can1357/oh-my-pi",
+    },
   },
   {
     id: "pi",
@@ -65,6 +106,12 @@ export const CUSTOMIZABLE_AGENTS: Agent[] = [
     ],
     probeConfig: () => new PiConfigService().probe(),
     installUrl: "https://pi.dev/docs/latest",
+    installSpec: {
+      macos: npmGlobal("--ignore-scripts", "@earendil-works/pi-coding-agent"),
+      linux: npmGlobal("--ignore-scripts", "@earendil-works/pi-coding-agent"),
+      windows: npmGlobal("--ignore-scripts", "@earendil-works/pi-coding-agent"),
+      docsUrl: "https://pi.dev/docs/latest",
+    },
   },
   {
     id: "opencode",
@@ -96,6 +143,14 @@ export const CUSTOMIZABLE_AGENTS: Agent[] = [
     },
     probeConfig: () => new OpenCodeConfigService().probe(),
     installUrl: "https://opencode.ai/docs/",
+    // OpenCode's npm package ships a stub; its postinstall script must run
+    // to download the platform-specific native binary.
+    installSpec: {
+      macos: npmGlobalWithPostinstall("opencode-ai"),
+      linux: npmGlobalWithPostinstall("opencode-ai"),
+      windows: npmGlobalWithPostinstall("opencode-ai"),
+      docsUrl: "https://opencode.ai/docs/",
+    },
   },
   {
     id: "codex",
@@ -117,15 +172,18 @@ export const CUSTOMIZABLE_AGENTS: Agent[] = [
     probeConfig: () => new CodexConfigService().probe(),
     scrubShellConfig: () =>
       scrubShellRc([
-        "CODEX_API_KEY",
-        "CODEX_ACCESS_TOKEN",
-        "OPENAI_BASE_URL",
-        "OPENAI_API_KEY",
+        ...CODEX_SCRUB_VARS,
         "CLI_HOP_CODEX_API_KEY",
         "CLI_HOP_OC_CODEX_API_KEY",
         "CLI_HOP_HERMES_CODEX_API_KEY",
       ]),
     installUrl: "https://developers.openai.com/codex/cli/",
+    installSpec: {
+      macos: curlPipe("https://chatgpt.com/codex/install.sh", "sh"),
+      linux: curlPipe("https://chatgpt.com/codex/install.sh", "sh"),
+      windows: irmPipe("https://chatgpt.com/codex/install.ps1"),
+      docsUrl: "https://developers.openai.com/codex/cli/",
+    },
   },
   {
     id: "grok",
@@ -145,19 +203,19 @@ export const CUSTOMIZABLE_AGENTS: Agent[] = [
         endpoint,
         model: selected,
         displayName: model?.displayName,
-        contextWindow: selected === "grok-4.5" ? 1000000 : undefined,
+        contextWindow: MODEL_CONTEXT_WINDOWS[selected],
       });
     },
     probeConfig: () => new GrokConfigService().probe(),
-    scrubShellConfig: () => scrubShellRc([
-      "CLI_HOP_API_KEY",
-      "CLI_HOP_AI_API_KEY",
-      "CLI_HOP_CODEX_API_KEY",
-      "CLI_HOP_OC_CODEX_API_KEY",
-      "CLI_HOP_HERMES_CODEX_API_KEY",
-      "CUSTOM_API_KEY",
-    ]),
+    scrubShellConfig: () => scrubShellRc(GROK_SCRUB_VARS),
     installUrl: "https://x.ai/cli",
+    // xAI ships no npm package — the npm `grok-cli` is third-party, never offered.
+    installSpec: {
+      macos: curlPipe("https://x.ai/cli/install.sh", "bash"),
+      linux: curlPipe("https://x.ai/cli/install.sh", "bash"),
+      windows: irmPipe("https://x.ai/cli/install.ps1"),
+      docsUrl: "https://docs.x.ai/build/overview",
+    },
   },
 ];
 
@@ -194,4 +252,17 @@ export function agentSupportsModel(agent: Agent, model: RemoteModel): boolean {
   return !model.apis?.length || agent.supportedProtocols.some((protocol) =>
     model.apis?.includes(protocol)
   );
+}
+
+/**
+ * The install spec for the running platform, or undefined when cli-hop has
+ * no verified install command there — the flow then degrades to the docs URL.
+ */
+export function installSpecFor(
+  agentId: string,
+  platform: "macos" | "linux" | "windows" | undefined
+): Agent["installSpec"] {
+  const spec = getAgentById(agentId)?.installSpec;
+  if (!spec || !platform) return undefined;
+  return spec[platform] ? spec : undefined;
 }

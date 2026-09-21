@@ -2,6 +2,7 @@ import { unlink } from "node:fs/promises";
 import { homedir } from "node:os";
 import { dirname, join } from "node:path";
 import type { ConfigProbe } from "../types.js";
+import { CLAUDE_CODE_ENV_KEYS } from "../types.js";
 import { writeSecureFile } from "./secure-file.js";
 import { readJsonDocument } from "./config-document.js";
 import { scrubShellRc } from "./shell-scrub.js";
@@ -137,15 +138,7 @@ export class ClaudeConfigService {
    * credential vars from common shell rc files (installer parity).
    * Returns the files that were modified.
    */
-  static readonly SCRUB_VARS = [
-    "ANTHROPIC_BASE_URL",
-    "ANTHROPIC_API_KEY",
-    "ANTHROPIC_AUTH_TOKEN",
-    "ANTHROPIC_TOKEN",
-    "CLAUDE_CODE_OAUTH_TOKEN",
-  ];
-
   async scrubShellRc(home: string = homedir()): Promise<string[]> {
-    return scrubShellRc(ClaudeConfigService.SCRUB_VARS, home);
+    return scrubShellRc(CLAUDE_CODE_ENV_KEYS, home);
   }
 }
