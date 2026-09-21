@@ -5,7 +5,6 @@ import { SettingsService } from "../services/settings.js";
 import { ensurePrerequisites } from "../services/prereq.js";
 import { ensureAgentInstalled } from "../services/installer.js";
 import {
-  agentSupportsModel,
   CUSTOMIZABLE_AGENTS,
   getAgentById,
   isAgentId,
@@ -56,9 +55,7 @@ export const runCommand = new Command("run")
       if (source === "remote") ui.ok(`${pools.length} models loaded from API`);
 
       const selectablePools = requestedAgent
-        ? pools.filter((pool) =>
-            pool.agents.some((agent) => agent.id === requestedAgent)
-          )
+        ? launch.compatiblePools(pools, getAgentById(requestedAgent)!)
         : pools;
 
       // Select pool if not specified
@@ -101,23 +98,11 @@ export const runCommand = new Command("run")
         process.exit(1);
       }
 
-      if (!options.model && !pool.agents.some((candidate) => candidate.id === agent.id)) {
-        ui.danger(`${agent.name} does not support the protocols advertised by ${pool.model}`);
-        process.exit(1);
-      }
       const selectedModel = options.model ?? pool.model;
-      if (models) {
-        const remoteModel = models.find((model) => model.id === selectedModel);
-        if (!remoteModel) {
-          ui.danger(`Model "${selectedModel}" is not in the CLI Hop catalogue.`);
-          process.exit(1);
-        }
-        if (!agentSupportsModel(agent, remoteModel)) {
-          ui.danger(
-            `${agent.name} does not support the protocols advertised by ${selectedModel}`
-          );
-          process.exit(1);
-        }
+      const problem = launch.compatibilityProblem(agent, pool, selectedModel, models);
+      if (problem) {
+        ui.danger(problem);
+        process.exit(1);
       }
       const prepared = await launch.prepare({
         agent,

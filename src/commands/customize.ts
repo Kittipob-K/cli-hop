@@ -4,13 +4,11 @@ import { AgentService } from "../services/agent.js";
 import { LaunchCoordinator } from "../services/launch.js";
 import { PoolService } from "../services/pool.js";
 import { SettingsService } from "../services/settings.js";
-import { endpointFromModelsBaseUrl } from "../services/endpoint.js";
 import { getAgentById, listAgentOptions } from "../services/registry.js";
 import { ensureAgentInstalled } from "../services/installer.js";
 import { ensurePrerequisites } from "../services/prereq.js";
 import { sectionTabs } from "../prompts/section-tabs.js";
 import type { Pool } from "../types.js";
-import { DEFAULT_MODELS_BASE_URL } from "../types.js";
 import * as ui from "../ui.js";
 
 /**
@@ -87,9 +85,7 @@ export const customizeCommand = new Command("customize")
 
         // 2. The key + endpoint are written into the Agent Config (ADR 0003);
         // nothing is injected into the environment.
-        const endpoint = endpointFromModelsBaseUrl(
-          settings.baseUrl ?? DEFAULT_MODELS_BASE_URL
-        );
+        const endpoint = launch.endpointFor(settings);
         ui.muted(
           `  credentials delivered via ${agent.name}'s config — no env export`
         );

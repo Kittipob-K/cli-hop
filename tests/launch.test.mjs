@@ -15,6 +15,36 @@ test("LaunchCoordinator centralizes compatible pool filtering", () => {
   assert.deepEqual(coordinator.compatiblePools(pools, agent).map((pool) => pool.id), ["responses"]);
 });
 
+test("LaunchCoordinator reports protocol mismatch even without model metadata", () => {
+  const coordinator = new LaunchCoordinator();
+  const agent = getAgentById("codex");
+  const pool = { id: "messages", name: "Messages", model: "m", agents: [getAgentById("claude-code")] };
+  const problem = coordinator.compatibilityProblem(agent, pool, "m");
+  assert.match(problem, /does not support/);
+});
+
+test("LaunchCoordinator checks catalogue presence and capabilities when metadata exists", () => {
+  const coordinator = new LaunchCoordinator();
+  const agent = getAgentById("codex");
+  const pool = { id: "responses", name: "Responses", model: "r", agents: [agent] };
+  assert.equal(coordinator.compatibilityProblem(agent, pool, "r"), null);
+  assert.match(
+    coordinator.compatibilityProblem(agent, pool, "unknown", [{ id: "other", apis: ["responses"] }]),
+    /not in the CLI Hop catalogue/
+  );
+  assert.match(
+    coordinator.compatibilityProblem(agent, pool, "claude-1", [{ id: "claude-1", apis: ["messages"] }]),
+    /does not support/
+  );
+});
+
+test("LaunchCoordinator skips catalogue checks when the Models API is down", () => {
+  const coordinator = new LaunchCoordinator();
+  const agent = getAgentById("codex");
+  const pool = { id: "responses", name: "Responses", model: "r", agents: [agent] };
+  assert.equal(coordinator.compatibilityProblem(agent, pool, "r", undefined), null);
+});
+
 test("LaunchCoordinator prepares one consistent launch contract", async () => {
   const calls = [];
   const agentService = {
