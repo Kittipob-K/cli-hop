@@ -3,6 +3,7 @@ import { join } from "node:path";
 import type { ConfigProbe, RemoteModel } from "../types.js";
 import { writeSecureFile } from "./secure-file.js";
 import { readJsonDocument } from "./config-document.js";
+import { chatCapableCatalogue, endpointV1 } from "./catalogue.js";
 
 const OPEN_CODE_SCHEMA_URL = "https://opencode.ai/config.json";
 const OPEN_CODE_PROVIDER_ID = "cli-hop";
@@ -61,13 +62,7 @@ export class OpenCodeConfigService {
     }
 
     const existingModels = isRecord(provider.models) ? provider.models : {};
-    const chatModels = input.models.filter(
-      (model) => !model.apis?.length || model.apis.includes("chat_completions")
-    );
-    const selected = chatModels.find((model) => model.id === input.selected);
-    const catalogue = selected
-      ? [selected, ...chatModels.filter((model) => model.id !== selected.id)]
-      : chatModels;
+    const catalogue = chatCapableCatalogue(input.models, input.selected);
     const models: Record<string, unknown> = {};
 
     for (const model of catalogue) {
@@ -93,7 +88,7 @@ export class OpenCodeConfigService {
       name: "CLI Hop",
       options: {
         ...(provider.options ?? {}),
-        baseURL: `${input.endpoint.replace(/\/+$/, "")}/v1`,
+        baseURL: endpointV1(input.endpoint),
         apiKey: input.apiKey,
       },
       models,

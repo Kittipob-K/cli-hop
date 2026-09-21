@@ -3,6 +3,7 @@ import { homedir } from "node:os";
 import { join } from "node:path";
 import type { ConfigProbe } from "../types.js";
 import { writeSecureFile } from "./secure-file.js";
+import { endpointV1 } from "./catalogue.js";
 
 /**
  * Merge-writes the Grok Build CLI config the same way the CLI Hop one-line
@@ -43,7 +44,7 @@ function isManagedModelHeading(line: string, modelId: string): boolean {
 }
 
 function renderManagedBlock(input: GrokConfigInput): string {
-  const baseUrl = `${input.endpoint.replace(/\/+$/, "")}/v1`;
+  const baseUrl = endpointV1(input.endpoint);
   const name = input.displayName?.trim() || input.model;
   const contextWindow = input.contextWindow ?? 200000;
   return [

@@ -3,6 +3,7 @@ import { join } from "node:path";
 import type { ConfigProbe, RemoteModel } from "../types.js";
 import { writeSecureFile } from "./secure-file.js";
 import { readJsonDocument } from "./config-document.js";
+import { chatCapableCatalogue, endpointV1, OPENAI_COMPLETIONS_API } from "./catalogue.js";
 
 /** Provider id written into Pi's models.json; also Pi's --model prefix. */
 export const PI_PROVIDER_ID = "cli-hop";
@@ -16,11 +17,6 @@ export interface PiModelsInput {
   models: RemoteModel[];
   /** Selected model id; written first in the models list. */
   selected: string;
-}
-
-/** Resolve the Pi wire API for a CLI Hop model from its advertised capabilities. */
-export function piApiFor(model: RemoteModel): string {
-  return "openai-completions";
 }
 
 /**
@@ -59,22 +55,16 @@ export class PiConfigService {
     const providers = {
       ...(currentProviders as Record<string, unknown> | undefined),
     };
-    const chatModels = input.models.filter(
-      (model) => !model.apis?.length || model.apis.includes("chat_completions")
-    );
-    const chatSelected = chatModels.find((model) => model.id === input.selected);
-    const catalogue = chatSelected
-      ? [chatSelected, ...chatModels.filter((model) => model.id !== chatSelected.id)]
-      : chatModels;
+    const catalogue = chatCapableCatalogue(input.models, input.selected);
 
     providers[PI_PROVIDER_ID] = {
-      baseUrl: `${input.endpoint.replace(/\/+$/, "")}/v1`,
+      baseUrl: endpointV1(input.endpoint),
       apiKey: input.apiKey,
       authHeader: true,
       models: catalogue.map((model) => ({
         id: model.id,
         name: model.displayName ?? model.id,
-        api: piApiFor(model),
+        api: OPENAI_COMPLETIONS_API,
       })),
     };
     doc = { ...doc, providers };

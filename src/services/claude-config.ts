@@ -2,7 +2,6 @@ import { unlink } from "node:fs/promises";
 import { homedir } from "node:os";
 import { dirname, join } from "node:path";
 import type { ConfigProbe } from "../types.js";
-import { endpointFromModelsBaseUrl } from "./endpoint.js";
 import { writeSecureFile } from "./secure-file.js";
 import { readJsonDocument } from "./config-document.js";
 import { scrubShellRc } from "./shell-scrub.js";
@@ -57,11 +56,6 @@ export class ClaudeConfigService {
     const home = homedir();
     this.claudeJsonPath = paths?.claudeJsonPath ?? join(home, ".claude.json");
     this.settingsPath = paths?.settingsPath ?? join(home, ".claude", "settings.json");
-  }
-
-  /** Derive the Claude base URL from a models baseUrl (strip /v1). */
-  static endpointFromBaseUrl(baseUrl: string): string {
-    return endpointFromModelsBaseUrl(baseUrl);
   }
 
   /** The currently configured model, when settings.json exists (Resync). */

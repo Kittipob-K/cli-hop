@@ -4,6 +4,7 @@ import { join } from "node:path";
 import { parse, stringify } from "yaml";
 import type { ConfigProbe, RemoteModel } from "../types.js";
 import { writeSecureFile } from "./secure-file.js";
+import { chatCapableCatalogue, endpointV1, OPENAI_COMPLETIONS_API } from "./catalogue.js";
 
 /** Provider id written into models.yml; also omp's --model prefix. */
 export const OMP_PROVIDER_ID = "cli-hop";
@@ -17,15 +18,6 @@ export interface OmpModelsInput {
   models: RemoteModel[];
   /** Selected model id; written first in the models list. */
   selected: string;
-}
-
-/**
- * Pick omp's wire api for a model. CLI Hop exposes these models through
- * OpenAI Chat Completions, which omp calls `openai-completions`.
- */
-export function ompApiFor(model: RemoteModel): string {
-  const apis = model.apis ?? [];
-  return "openai-completions";
 }
 
 /**
@@ -71,16 +63,10 @@ export class OmpConfigService {
     const providers = {
       ...(currentProviders as Record<string, unknown> | undefined),
     };
-    const chatModels = input.models.filter(
-      (model) => !model.apis?.length || model.apis.includes("chat_completions")
-    );
-    const selected = chatModels.find((model) => model.id === input.selected);
-    const catalogue: RemoteModel[] = selected
-      ? [selected, ...chatModels.filter((model) => model.id !== selected.id)]
-      : chatModels;
+    const catalogue = chatCapableCatalogue(input.models, input.selected);
 
     providers[OMP_PROVIDER_ID] = {
-      baseUrl: `${input.endpoint.replace(/\/+$/, "")}/v1`,
+      baseUrl: endpointV1(input.endpoint),
       apiKey: input.apiKey,
       // CLI Hop speaks Bearer auth on both wires (like the /models API).
       authHeader: true,
@@ -89,7 +75,7 @@ export class OmpConfigService {
       models: catalogue.map((m) => ({
         id: m.id,
         name: m.displayName ?? m.id,
-        api: ompApiFor(m),
+        api: OPENAI_COMPLETIONS_API,
       })),
     };
     doc = { ...doc, providers };
