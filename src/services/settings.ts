@@ -5,6 +5,9 @@ import type { Settings } from "../types.js";
 import { openKeychain, type Keychain } from "./keychain.js";
 import { writeSecureFile } from "./secure-file.js";
 
+/** Where the Credential Store actually put the Primary API Key. */
+export type CredentialLocation = "keychain" | "file" | "none";
+
 /**
  * The Credential Store (ADR 0001): non-secret settings live in
  * ${XDG_CONFIG_HOME:-~/.config}/cli-hop/settings.json (0600), while the
@@ -21,8 +24,6 @@ import { writeSecureFile } from "./secure-file.js";
  */
 export class SettingsService {
   readonly filePath: string;
-  /** Where the last setApiKey()/save() put the key, for honest messaging. */
-  lastCredentialLocation: "keychain" | "file" | "none" = "none";
 
   /** undefined = not probed yet; null = no usable keychain. */
   #keychain: Keychain | null | undefined = undefined;
@@ -92,8 +93,11 @@ export class SettingsService {
     return file;
   }
 
-  /** Persist a new Primary API Key (undefined clears it from both locations). */
-  async setApiKey(key?: string): Promise<void> {
+  /**
+   * Persist a new Primary API Key (undefined clears it from both locations).
+   * Returns where the key was actually stored, for honest messaging.
+   */
+  async setApiKey(key?: string): Promise<CredentialLocation> {
     const keychain = this.#resolveKeychain();
     const file = await this.#readFile();
     const { apiKey: _dropped, ...rest } = file;
@@ -102,40 +106,42 @@ export class SettingsService {
         if (key) keychain.setPassword(key);
         else keychain.deletePassword();
         await this.#writeFile(rest);
-        this.lastCredentialLocation = key ? "keychain" : "none";
-        return;
+        return key ? "keychain" : "none";
       } catch {
         // Keychain write failed — keep the key in the file so it is never
         // lost to an environment issue.
       }
     }
     await this.#writeFile(key ? { ...rest, apiKey: key } : rest);
-    this.lastCredentialLocation = key ? "file" : "none";
+    return key ? "file" : "none";
   }
 
-  async save(settings: Settings): Promise<void> {
+  /**
+   * Persist non-secret settings; when a keychain is in play the key is stored
+   * there and the file is written WITHOUT it. Returns where the key landed.
+   */
+  async save(settings: Settings): Promise<CredentialLocation> {
     const { apiKey, ...rest } = settings;
     const keychain = this.#resolveKeychain();
     if (!keychain) {
       await this.#writeFile(apiKey ? { ...rest, apiKey } : rest);
-      if (apiKey) this.lastCredentialLocation = "file";
-      return;
+      return apiKey ? "file" : "none";
     }
     if (apiKey) {
       try {
         keychain.setPassword(apiKey);
-        this.lastCredentialLocation = "keychain";
+        return "keychain";
       } catch {
         // Keychain write failed — keep the key in the file instead.
         await this.#writeFile({ ...rest, apiKey });
-        this.lastCredentialLocation = "file";
-        return;
+        return "file";
       }
     }
     // A save without a key NEVER deletes an existing keychain item — that is
     // setApiKey(undefined)'s job, so a transient keychain read failure can
     // never wipe the user's key through an ordinary settings write.
     await this.#writeFile(rest);
+    return "none";
   }
 
   /** Show the key with only the last 4 chars visible, e.g. "sk-...abcd". */

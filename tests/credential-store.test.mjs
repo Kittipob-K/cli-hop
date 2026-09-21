@@ -63,7 +63,7 @@ test("setApiKey targets the keychain and save never writes a key into the file t
 
   await service.setApiKey("ccsk-abc");
   assert.equal(kc.state.secret, "ccsk-abc");
-  assert.equal(service.lastCredentialLocation, "keychain");
+  assert.equal(await service.setApiKey("ccsk-abc"), "keychain");
   assert.equal(JSON.parse(await readFile(filePath, "utf8")).apiKey, undefined);
 
   // save() without a key must not destroy the stored key (only setApiKey clears).
@@ -82,7 +82,7 @@ test("unreachable keychain degrades to the settings file without losing the key"
   const service = new SettingsService(filePath, { keychain: dead });
 
   await service.setApiKey("ccsk-file-only");
-  assert.equal(service.lastCredentialLocation, "file");
+  assert.equal(await service.setApiKey("ccsk-file-only"), "file");
   assert.equal(JSON.parse(await readFile(filePath, "utf8")).apiKey, "ccsk-file-only");
   assert.equal((await service.load()).apiKey, "ccsk-file-only");
 });

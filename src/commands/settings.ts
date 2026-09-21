@@ -8,27 +8,40 @@ import * as ui from "../ui.js";
 
 export type SettingsMenuResult = "back";
 
+/** The prompts the settings menu needs; fakes implement these for tests. */
+export interface SettingsPrompts {
+  /** API key entry — hidden input. */
+  password: (options: { message: string; validate?: (value: string) => boolean | string }) => Promise<string>;
+  /** Base URL entry — visible input with a default. */
+  input: (options: { message: string; default?: string; validate?: (value: string) => boolean | string }) => Promise<string>;
+  /** Yes/no confirmation. */
+  confirm: (options: { message: string; default?: boolean }) => Promise<boolean>;
+}
+
+const inquirerPrompts: SettingsPrompts = { password, input, confirm };
+
 export async function handleSettingsAction(
   action: Exclude<SectionMenuAction, { type: "agent" } | { type: "back" }>,
   settingsService: SettingsService,
-  resyncService?: ResyncService
+  resyncService?: ResyncService,
+  prompts: SettingsPrompts = inquirerPrompts
 ): Promise<SettingsMenuResult> {
   const settings = await settingsService.load();
 
   if (action.type === "apiKey") {
-    const apiKey = await password({
+    const apiKey = await prompts.password({
       message: `${ui.envvar("CLI_HOP_API_KEY")} =`,
       validate: (value) => value.trim() ? true : "API key cannot be empty",
     });
-    await settingsService.setApiKey(apiKey.trim());
-    ui.ok(settingsService.lastCredentialLocation === "keychain"
+    const location = await settingsService.setApiKey(apiKey.trim());
+    ui.ok(location === "keychain"
       ? "API key saved to the OS keychain."
       : `API key saved to ${settingsService.filePath}`);
     return "back";
   }
 
   if (action.type === "baseUrl") {
-    const baseUrl = await input({
+    const baseUrl = await prompts.input({
       message: `${ui.envvar("CLI_HOP_BASE_URL")} =`,
       default: settings.baseUrl ?? DEFAULT_MODELS_BASE_URL,
       validate: (value) => {
@@ -64,7 +77,7 @@ export async function handleSettingsAction(
     return "back";
   }
 
-  const shouldReset = await confirm({
+  const shouldReset = await prompts.confirm({
     message: "Clear the API key and Base URL?",
     default: false,
   });

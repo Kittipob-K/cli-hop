@@ -51,7 +51,7 @@ test("explicitly disabled keychain keeps credentials in the settings file", asyn
   await settings.setApiKey("file-only-key");
 
   assert.equal(JSON.parse(await readFile(filePath, "utf8")).apiKey, "file-only-key");
-  assert.equal(settings.lastCredentialLocation, "file");
+  assert.equal(await settings.setApiKey("file-only-key"), "file");
 });
 
 test("Claude config refuses to overwrite malformed JSON", async () => {

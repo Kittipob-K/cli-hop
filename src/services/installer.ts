@@ -235,11 +235,15 @@ function printOutputTail(output: string, lines = 5): void {
  * Next-best-step install check (forge-login style, like ensurePrerequisites):
  * before launching, verify the agent CLI resolves on PATH; when missing, ask
  * whether to run the official installer for the current platform right there.
+ * `confirmFn` is injectable so the decision logic is unit-testable.
  *
  * Never crashes the flow (invariant 4): on decline, non-interactive stdin, or
  * install failure it prints the docs URL and returns false.
  */
-export async function ensureAgentInstalled(agent: Agent): Promise<boolean> {
+export async function ensureAgentInstalled(
+  agent: Agent,
+  confirmFn: (options: { message: string; default?: boolean }) => Promise<boolean> = confirm
+): Promise<boolean> {
   if (await isInstalled(agent.command)) return true;
 
   const platform = currentPlatformKey();
@@ -265,7 +269,7 @@ export async function ensureAgentInstalled(agent: Agent): Promise<boolean> {
 
   let confirmed: boolean;
   try {
-    confirmed = await confirm({
+    confirmed = await confirmFn({
       message: `Install ${agent.name} now?`,
       default: true,
     });
