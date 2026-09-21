@@ -40,11 +40,14 @@ src/
   services/
     settings.ts         SettingsService: Credential Store — keychain-first API key, base URL,
                         last-used agent + ~/.config/cli-hop/settings.json
+                        (setApiKey/save return where the key landed)
     keychain.ts         openKeychain(): OS keychain entry (service cli-hop, account = username); null when unavailable/disabled
-    prereq.ts           ensurePrerequisites(): inline prompts for missing baseUrl/apiKey
+    prereq.ts           ensurePrerequisites(): inline prompts for missing baseUrl/apiKey (injectable ask)
+    catalogue.ts        shared config-writer internals: chat-capable catalogue reorder,
+                        /v1 endpoint join, omp/pi wire api constant
     pool.ts             PoolService: local pools + CLI Hop /models API (Bearer, pagination)
     launch.ts           LaunchCoordinator: shared pool selection, compatibility,
-                        config preparation, and agent launch policy
+                        endpoint derivation, and agent launch policy
     update.ts           npm registry check (24h cache file), semver compare, `npm install -g` spawn
     agent.ts            AgentService: prepare launch plan, clean env, spawn agent
     config-document.ts  shared optional object-shaped JSON/JSONC config reader
@@ -62,11 +65,12 @@ src/
                         chat models)
     shell-scrub.ts      shared stale rc-export scrubber for installer parity
     secure-file.ts      atomic 0600 writes + managed-directory permissions
-    installer.ts        isInstalled() PATH scan + AGENT_INSTALL_SPECS official
-                        per-platform installers + ensureAgentInstalled() prompt
+    installer.ts        isInstalled() PATH scan + official per-platform installers
+                        (specs live on the registry adapters as `installSpec`) + ensureAgentInstalled() prompt
     resync.ts           ResyncService: rewrite installed agents' existing configs
                         with the current key/endpoint, preserving each model
-    registry.ts         agent adapters: unset rules, protocols, args, config preparation
+    registry.ts         agent adapters: unset rules, protocols, args, config preparation,
+                        install specs
 ```
 
 ### Core invariants (do not break)
