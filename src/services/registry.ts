@@ -21,7 +21,6 @@ import {
   npmGlobal,
   npmGlobalWithPostinstall,
 } from "./installer.js";
-import * as ui from "../ui.js";
 
 /** Upstream context windows recorded in managed configs; catalogue facts. */
 const MODEL_CONTEXT_WINDOWS: Record<string, number> = {
@@ -134,11 +133,6 @@ export const CUSTOMIZABLE_AGENTS: Agent[] = [
         models,
         selected,
       });
-      for (const modelId of result.staleModels) {
-        ui.warn(
-          `stale CLI Hop model ${ui.val(`cli-hop/${modelId}`)} kept in opencode.json - the gateway no longer serves it; remove it from the file to prune`
-        );
-      }
       return [result.path];
     },
     probeConfig: () => new OpenCodeConfigService().probe(),

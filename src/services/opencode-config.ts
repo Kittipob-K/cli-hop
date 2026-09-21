@@ -23,7 +23,6 @@ export interface OpenCodeConfigInput {
 
 export interface OpenCodeConfigResult {
   path: string;
-  staleModels: string[];
 }
 
 /**
@@ -79,8 +78,6 @@ export class OpenCodeConfigService {
       };
     }
 
-    const staleModels: string[] = [];
-
     const providers = { ...(existingProviders ?? {}) };
     providers[OPEN_CODE_PROVIDER_ID] = {
       ...provider,
@@ -104,7 +101,7 @@ export class OpenCodeConfigService {
     if (!documentResult.existed) output.$schema = OPEN_CODE_SCHEMA_URL;
 
     await writeSecureFile(this.configPath, `${JSON.stringify(output, null, 2)}\n`);
-    return { path: this.configPath, staleModels };
+    return { path: this.configPath };
   }
 
   /** The configured `model` ref, with its `cli-hop/` prefix stripped (Resync). */
