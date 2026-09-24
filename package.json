@@ -3,9 +3,10 @@
   "version": "0.1.9",
   "description": "CLI tool for switching AI pools based on selected models",
   "engines": {
-    "node": ">=22"
+    "node": ">=24"
   },
   "type": "module",
+  "packageManager": "pnpm@12.3.4",
   "bin": {
     "cli-hop": "dist/index.js"
   },
@@ -17,8 +18,8 @@
   "scripts": {
     "dev": "tsx src/index.ts",
     "build": "tsc",
-    "prepack": "npm run build",
-    "test": "npm run build && node --test tests/*.test.mjs",
+    "prepack": "pnpm run build",
+    "test": "pnpm run build && node --test tests/*.test.mjs",
     "typecheck": "tsc --noEmit",
     "start": "node dist/index.js"
   },
@@ -39,14 +40,16 @@
     "url": "https://github.com/Kittipob-K/cli-hop/issues"
   },
   "dependencies": {
+    "@inquirer/core": "^10.3.2",
     "@inquirer/prompts": "^7.2.0",
+    "@inquirer/type": "^3.0.10",
     "@napi-rs/keyring": "^2.0.0",
     "chalk": "^5.4.1",
     "commander": "^12.1.0",
     "yaml": "^2.9.0"
   },
   "devDependencies": {
-    "@types/node": "^22.10.0",
+    "@types/node": "^24.0.0",
     "tsx": "^4.19.0",
     "typescript": "^5.7.0"
   }

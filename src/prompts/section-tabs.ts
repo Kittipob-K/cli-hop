@@ -1,4 +1,5 @@
 import { createPrompt, isDownKey, isEnterKey, isUpKey, useKeypress, useState } from "@inquirer/core";
+import type { Prompt } from "@inquirer/type";
 import type { AgentOption } from "../services/registry.js";
 import * as ui from "../ui.js";
 
@@ -25,7 +26,7 @@ type Section = "agents" | "settings";
  * One terminal screen for the top-level tabs and their content. Left/right
  * updates the selected tab and its list immediately; Enter opens an item.
  */
-export const sectionTabs = createPrompt<SectionMenuAction, SectionMenuConfig>(
+export const sectionTabs: Prompt<SectionMenuAction, SectionMenuConfig> = createPrompt(
   (config, done) => {
     const [section, setSection] = useState<Section>(
       config.settingsOnly ? "settings" : (config.initialSection ?? "agents")
