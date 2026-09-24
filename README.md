@@ -124,7 +124,7 @@ $ cli-hop
 
 ## Requirements
 
-- Node.js **>= 22**
+- Node.js **>= 24**
 - The agent CLI you want to launch — if it is missing, cli-hop offers to
   install it with the official per-platform installer before launching.
 

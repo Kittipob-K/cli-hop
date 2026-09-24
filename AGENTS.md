@@ -19,7 +19,7 @@ npm run dev          # run via tsx without building
 node dist/index.js   # built CLI; `cli-hop` = npm link global
 ```
 
-- Node.js **>= 22** required (`Promise.withResolvers` is used).
+- Node.js **>= 24** required (`Promise.withResolvers` is used).
 - Tests use the built-in `node:test` runner (see Testing below).
 
 ## Architecture

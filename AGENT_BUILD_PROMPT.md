@@ -162,7 +162,7 @@ them; the test suite must assert them.
 
 ## 3. Tech stack & constraints
 
-- **Node.js >= 22** (you may use `Promise.withResolvers`).
+- **Node.js >= 24** (you may use `Promise.withResolvers`).
 - **TypeScript, strict mode**, compiled to **ESM** (`"type": "module"`,
   `moduleResolution: "bundler"`). Imports use `.js` extensions even for
   `.ts` files.
